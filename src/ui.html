@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Kilo Gateway</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --side: #0d0d13;
+    --surface: #121218;
+    --surface-2: #17171f;
+    --surface-3: #1e1e28;
+    --border: #232330;
+    --border-strong: #30303f;
+    --text: #ececf2;
+    --muted: #9b9baa;
+    --faint: #6c6c7d;
+    --accent: #8b7cf6;
+    --accent-2: #a99cff;
+    --accent-soft: rgba(139, 124, 246, .13);
+    --accent-border: rgba(139, 124, 246, .38);
+    --ok: #34d399;
+    --warn: #fbbf24;
+    --bad: #fb7185;
+    --info: #60a5fa;
+    --c1: #8b7cf6;
+    --c2: #34d399;
+    --c3: #fbbf24;
+    --c4: #60a5fa;
+    --c5: #f472b6;
+    --c6: #22d3ee;
+    --radius: 14px;
+    --radius-sm: 9px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { color-scheme: dark; }
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(900px 420px at 78% -8%, rgba(139, 124, 246, .10), transparent 60%),
+      radial-gradient(700px 380px at 8% 110%, rgba(52, 211, 153, .05), transparent 70%),
+      var(--bg);
+    color: var(--text);
+    font: 14px/1.55 var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+  [hidden] { display: none !important; }
+  ::selection { background: var(--accent); color: #0b0716; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #262634; border-radius: 8px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-track { background: transparent; }
+  a { color: var(--accent-2); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  code, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  .faint { color: var(--faint); }
+  .small { font-size: 12px; }
+
+  button, .btn {
+    font: 600 13px/1 var(--font);
+    color: var(--text);
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 9px 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    white-space: nowrap;
+    transition: background .15s ease, border-color .15s ease, transform .1s ease, color .15s ease;
+  }
+  button:hover, .btn:hover { background: var(--surface-3); border-color: #3b3b4d; text-decoration: none; }
+  button:active, .btn:active { transform: translateY(1px); }
+  button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+  button.primary, .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0c0818;
+  }
+  button.primary:hover, .btn.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
+  button.ghost { background: transparent; border-color: transparent; color: var(--muted); padding: 7px 9px; }
+  button.ghost:hover { background: var(--surface-2); color: var(--text); }
+  button.danger { color: var(--bad); border-color: rgba(251, 113, 133, .32); background: rgba(251, 113, 133, .07); }
+  button.danger:hover { background: rgba(251, 113, 133, .13); border-color: rgba(251, 113, 133, .45); }
+  button.sm { padding: 6px 10px; font-size: 12px; }
+  button.icon { padding: 8px; }
+
+  input, select, textarea {
+    font: 400 13px/1.45 var(--font);
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 9px 11px;
+    width: 100%;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  input::placeholder, textarea::placeholder { color: var(--faint); }
+  textarea { resize: vertical; min-height: 90px; }
+  select { appearance: none; background-image: none; cursor: pointer; }
+  label.field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  label.check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; }
+  label.check input { width: auto; accent-color: var(--accent); }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .grow { flex: 1; min-width: 0; }
+
+  /* ---------- shell ---------- */
+  .app { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: 100vh; }
+  .sidebar {
+    position: sticky; top: 0; align-self: start; height: 100vh;
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 20px 14px 16px;
+    background: rgba(13, 13, 19, .82);
+    border-right: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+  }
+  .brand { display: flex; align-items: center; gap: 11px; padding: 0 8px; min-width: 0; }
+  .mark {
+    width: 34px; height: 34px; flex: none; border-radius: 10px;
+    display: grid; place-items: center;
+    font: 700 17px/1 var(--mono); color: #d9d2ff;
+    background: linear-gradient(145deg, #211d38, #14141c);
+    border: 1px solid var(--accent-border);
+    box-shadow: 0 0 24px rgba(139, 124, 246, .16) inset;
+  }
+  .brand h1 { font-size: 15px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; }
+  .brand .sub { color: var(--faint); font-size: 11.5px; font-weight: 500; }
+  .nav { display: flex; flex-direction: column; gap: 2px; margin-top: 26px; }
+  .nav a {
+    position: relative; display: flex; align-items: center; gap: 10px;
+    padding: 9px 11px; border-radius: 9px;
+    color: var(--muted); font-size: 13.5px; font-weight: 600;
+    transition: color .15s ease, background .15s ease;
+  }
+  .nav a:hover { color: var(--text); background: var(--surface-2); text-decoration: none; }
+  .nav a.active { color: var(--text); background: var(--surface-2); }
+  .nav a.active::before {
+    content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 2px;
+    border-radius: 2px; background: var(--accent);
+  }
+  .nav a .ico { width: 16px; height: 16px; flex: none; opacity: .9; }
+  .nav a.active .ico { color: var(--accent); }
+  .side-spacer { flex: 1; }
+  .side-foot { display: flex; flex-direction: column; gap: 10px; padding: 0 4px; }
+  .status {
+    display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+    max-width: 100%; padding: 7px 11px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--border);
+  }
+  .status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; }
+  .status.ok { color: var(--ok); border-color: rgba(52, 211, 153, .24); }
+  .status.ok .dot { background: var(--ok); box-shadow: 0 0 0 3px rgba(52, 211, 153, .12); }
+  .status.warn { color: var(--warn); border-color: rgba(251, 191, 36, .24); }
+  .status.warn .dot { background: var(--warn); }
+  .status.bad { color: var(--bad); border-color: rgba(251, 113, 133, .24); }
+  .status.bad .dot { background: var(--bad); }
+  .side-version { color: var(--faint); font-size: 11.5px; padding-left: 7px; }
+  main { min-width: 0; padding: 28px clamp(18px, 3.2vw, 42px) 48px; }
+  .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+  .topbar h2 { font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
+  .topbar p { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .top-actions { display: flex; align-items: center; gap: 8px; padding-top: 3px; flex-wrap: wrap; justify-content: flex-end; }
+  .view { max-width: 1180px; }
+
+  /* ---------- primitives ---------- */
+  .seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+  .seg button { border: 0; background: transparent; color: var(--muted); padding: 6px 11px; border-radius: 7px; font-size: 12px; }
+  .seg button:hover { background: var(--surface-2); color: var(--text); }
+  .seg button.active { background: var(--surface-3); color: var(--text); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+  .card.pad-sm { padding: 14px; }
+  .card + .card { margin-top: 0; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .card-head h3 { font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+  .card-head .hint { color: var(--faint); font-size: 12px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .stat { background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 17px; min-width: 0; }
+  .stat .label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .stat .label .ico { width: 14px; height: 14px; color: var(--faint); }
+  .stat .value { margin-top: 9px; font-size: 26px; font-weight: 650; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat .foot { margin-top: 7px; font-size: 12px; color: var(--faint); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+  .legend { display: flex; align-items: center; gap: 14px; font-size: 11.5px; color: var(--muted); flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart text { fill: var(--faint); font: 10.5px var(--mono); }
+  .chart .grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 5; opacity: .55; }
+  .empty { text-align: center; color: var(--faint); padding: 28px 10px !important; }
+  .loading { display: flex; align-items: center; justify-content: center; gap: 11px; min-height: 240px; color: var(--muted); font-size: 13px; }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--border-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-box { border: 1px solid rgba(251, 113, 133, .3); background: rgba(251, 113, 133, .07); color: #fecdd3; border-radius: var(--radius); padding: 14px 16px; font-size: 13px; word-break: break-word; }
+  .warn-box { border: 1px solid rgba(251, 191, 36, .3); background: rgba(251, 191, 36, .06); color: #fde68a; border-radius: var(--radius); padding: 12px 14px; font-size: 12.5px; }
+
+  /* ---------- tables ---------- */
+  .table-wrap { border: 1px solid var(--border); border-radius: 12px; overflow: auto; background: var(--surface); }
+  table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data th {
+    position: sticky; top: 0; z-index: 1;
+    background: var(--surface-2);
+    color: var(--muted); font-size: 11px; font-weight: 650;
+    letter-spacing: .04em; text-transform: uppercase;
+    padding: 9px 13px; text-align: left; white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+  }
+  table.data td { padding: 10px 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  table.data tr:last-child td { border-bottom: 0; }
+  table.data tbody tr { transition: background .12s ease; }
+  table.data tbody tr:hover { background: rgba(255, 255, 255, .022); }
+  tr.clickable { cursor: pointer; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .cell-main { font-weight: 550; }
+  .cell-sub { color: var(--faint); font-size: 11.5px; margin-top: 1px; }
+  .truncate { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .table-scroll { max-height: 460px; overflow: auto; border-radius: 12px; border: 1px solid var(--border); }
+  .table-scroll table.data th { top: 0; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2.5px 8px; border-radius: 999px; font-size: 11px; font-weight: 650; border: 1px solid transparent; letter-spacing: .01em; }
+  .badge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .badge.ok { color: var(--ok); background: rgba(52, 211, 153, .09); border-color: rgba(52, 211, 153, .2); }
+  .badge.warn { color: var(--warn); background: rgba(251, 191, 36, .09); border-color: rgba(251, 191, 36, .2); }
+  .badge.bad { color: var(--bad); background: rgba(251, 113, 133, .09); border-color: rgba(251, 113, 133, .2); }
+  .badge.neutral { color: var(--muted); background: var(--surface-2); border-color: var(--border); }
+  .badge.violet { color: var(--accent-2); background: var(--accent-soft); border-color: var(--accent-border); }
+  .tag { display: inline-block; padding: 1px 6px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); font: 500 10.5px/1.6 var(--mono); }
+
+  /* ---------- keys / playground / settings ---------- */
+  .key-prefix { font-family: var(--mono); color: var(--muted); font-size: 12px; }
+  .secret-box {
+    display: flex; align-items: center; gap: 10px;
+    background: #0b0b11; border: 1px solid var(--accent-border);
+    border-radius: 10px; padding: 12px 14px; margin: 14px 0;
+  }
+  .secret-box code { flex: 1; min-width: 0; word-break: break-all; color: #d9d2ff; font-size: 12.5px; }
+  .playgrid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 14px; align-items: start; }
+  .output {
+    background: #0a0a10; border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; min-height: 380px; max-height: 640px; overflow: auto;
+    white-space: pre-wrap; word-break: break-word;
+    font: 13px/1.65 var(--mono); color: #dedee8;
+  }
+  .output .placeholder { color: var(--faint); font-family: var(--font); }
+  .meta-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--faint); font-size: 11.5px; margin-top: 10px; min-height: 17px; }
+  .def-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 22px; }
+  .def { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .def:last-child { border-bottom: 0; }
+  .def dt { color: var(--muted); }
+  .def dd { font-family: var(--mono); font-size: 12px; color: var(--text); text-align: right; word-break: break-all; }
+  .snippet { position: relative; background: #0a0a10; border: 1px solid var(--border); border-radius: 10px; padding: 13px 44px 13px 14px; margin-top: 8px; }
+  .snippet pre { white-space: pre-wrap; word-break: break-word; font: 12px/1.6 var(--mono); color: #c9c9d6; }
+  .snippet button { position: absolute; top: 8px; right: 8px; }
+  .keys-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .keys-toolbar .grow { min-width: 180px; }
+  .keys-toolbar select { width: auto; }
+  .pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--faint); font-size: 12px; }
+
+  /* ---------- modal / login / toast ---------- */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 60;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; background: rgba(4, 4, 8, .72); backdrop-filter: blur(6px);
+  }
+  .modal {
+    width: min(560px, 100%); max-height: min(86vh, 760px); overflow: auto;
+    background: var(--surface); border: 1px solid var(--border-strong);
+    border-radius: 16px; padding: 22px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, .55);
+  }
+  .modal.wide { width: min(760px, 100%); }
+  .modal h3 { font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+  .modal p { color: var(--muted); font-size: 13px; margin-top: 5px; }
+  .modal .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+  .modal .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
+  .modal .form-grid .full { grid-column: 1 / -1; }
+  .detail-grid { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 0; margin-top: 16px; font-size: 12.5px; }
+  .detail-grid dt { color: var(--faint); padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .detail-grid dd { padding: 8px 0; border-bottom: 1px solid var(--border); font-family: var(--mono); word-break: break-word; }
+  .login-overlay {
+    position: fixed; inset: 0; z-index: 80;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+    background:
+      radial-gradient(700px 360px at 50% 0%, rgba(139, 124, 246, .13), transparent 70%),
+      var(--bg);
+  }
+  .login-card { width: min(390px, 100%); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 18px; padding: 26px; box-shadow: 0 30px 90px rgba(0,0,0,.5); }
+  .login-card .brand { padding: 0; margin-bottom: 20px; }
+  .login-card h2 { font-size: 19px; letter-spacing: -.02em; }
+  .login-card p { color: var(--muted); font-size: 13px; margin-top: 5px; }
+  .login-card form { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .login-error { color: var(--bad); font-size: 12px; min-height: 16px; }
+  #toasts { position: fixed; right: 18px; bottom: 18px; z-index: 100; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+  .toast {
+    max-width: min(420px, 90vw); padding: 11px 14px;
+    background: var(--surface-3); border: 1px solid var(--border-strong);
+    border-radius: 10px; font-size: 12.5px; color: var(--text);
+    box-shadow: 0 10px 34px rgba(0, 0, 0, .45);
+    animation: pop .18s ease both;
+  }
+  .toast.ok { border-color: rgba(52, 211, 153, .4); }
+  .toast.bad { border-color: rgba(251, 113, 133, .4); }
+  @keyframes pop { from { opacity: 0; transform: translateY(6px); } }
+
+  @media (max-width: 980px) {
+    .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3, .playgrid { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 700px) {
+    .keys-toolbar > .grow { flex: 1 1 100%; min-width: 0; }
+    .keys-toolbar select { flex: 1 1 130px; min-width: 0; }
+    .keys-toolbar > button { flex: 0 1 auto; }
+    .table-scroll { max-height: 62vh; }
+    .output { max-height: 460px; }
+  }
+  @media (max-width: 860px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .sidebar {
+      position: static; height: auto; flex-direction: row; align-items: center;
+      padding: 10px 12px; border-right: 0; border-bottom: 1px solid var(--border);
+      overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    }
+    .sidebar::-webkit-scrollbar { display: none; }
+    .brand { flex: none; }
+    .brand .sub, .side-foot, .side-spacer { display: none; }
+    .nav { flex-direction: row; margin: 0 0 0 10px; }
+    .nav a { padding: 8px 10px; }
+    .nav a.active::before { display: none; }
+    main { padding: 22px 16px 40px; }
+    .topbar { flex-direction: column; gap: 12px; }
+    .top-actions { justify-content: flex-start; width: 100%; }
+    .grid-2 { grid-template-columns: minmax(0, 1fr); }
+    .def-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 560px) {
+    main { padding: 18px 13px 36px; }
+    .topbar { margin-bottom: 18px; gap: 10px; }
+    .topbar h2 { font-size: 20px; }
+    .topbar p { font-size: 12.5px; }
+    .top-actions { gap: 6px; }
+    .stat-grid { gap: 10px; }
+    .stat { padding: 14px 15px; }
+    .stat .value { font-size: 24px; }
+    .card { padding: 15px; border-radius: 12px; }
+    .card-head { flex-wrap: wrap; margin-bottom: 12px; }
+    .card-head .hint { flex-basis: 100%; }
+    .grid-2, .grid-3, .playgrid { gap: 10px; }
+    .keys-toolbar { gap: 6px; }
+    .keys-toolbar select { flex: 1 1 100%; }
+    .keys-toolbar > button { flex: 1 1 auto; }
+    .pager { flex-wrap: wrap; gap: 8px; }
+    .modal-backdrop { padding: 12px; }
+    .modal { padding: 18px; border-radius: 14px; }
+    .modal .modal-actions { flex-wrap: wrap; }
+    .modal .form-grid { grid-template-columns: minmax(0, 1fr); }
+    .detail-grid { grid-template-columns: minmax(0, 1fr); }
+    .detail-grid dt { padding: 8px 0 2px; border-bottom: 0; font-size: 11px; }
+    .detail-grid dd { padding: 0 0 9px; }
+    .output { min-height: 300px; max-height: 55vh; padding: 13px; }
+    .login-card { padding: 22px 18px; }
+    .toast { max-width: none; }
+    #toasts { left: 12px; right: 12px; align-items: stretch; }
+    .brand h1 { font-size: 14px; }
+    .nav a span { display: none; }
+    .nav a { padding: 8px 9px; }
+    .stat-grid { grid-template-columns: minmax(0, 1fr); }
+    .table-wrap, .table-scroll { border-radius: 10px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+</head>
+<body>
+<div id="login" class="login-overlay" hidden>
+  <div class="login-card">
+    <div class="brand">
+      <div class="mark">K</div>
+      <div><h1>Kilo Gateway</h1><div class="sub">Admin console</div></div>
+    </div>
+    <h2>Unlock the dashboard</h2>
+    <p>Enter the value of <code>ADMIN_TOKEN</code>. It is stored in this browser only.</p>
+    <form id="login-form">
+      <input id="login-token" type="password" autocomplete="current-password" placeholder="Admin token" aria-label="Admin token" required>
+      <div id="login-error" class="login-error"></div>
+      <button class="primary" type="submit" style="width:100%">Continue</button>
+    </form>
+  </div>
+</div>
+
+<div id="app" class="app" hidden>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">K</div>
+      <div><h1>Kilo Gateway</h1><div class="sub">Model access plane</div></div>
+    </div>
+    <nav class="nav" id="nav">
+      <a href="#overview" data-page="overview">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z" stroke-linejoin="round"/></svg>
+        <span>Overview</span>
+      </a>
+      <a href="#playground" data-page="playground">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a9 9 0 1 1 18 0Z" stroke-linejoin="round"/><path d="M8 11h8M8 15h5" stroke-linecap="round"/></svg>
+        <span>Playground</span>
+      </a>
+      <a href="#models" data-page="models">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 9 5-9 5-9-5 9-5Z" stroke-linejoin="round"/><path d="m3 13 9 5 9-5" stroke-linejoin="round"/></svg>
+        <span>Models</span>
+      </a>
+      <a href="#keys" data-page="keys">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l2 2M14 9l2 2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>API keys</span>
+      </a>
+      <a href="#requests" data-page="requests">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10" stroke-linecap="round"/></svg>
+        <span>Requests</span>
+      </a>
+      <a href="#settings" data-page="settings">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.07V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.07-.4H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.07V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.16.36.4.7.6 1 .28.26.66.4 1.07.4H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51.6Z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Settings</span>
+      </a>
+    </nav>
+    <div class="side-spacer"></div>
+    <div class="side-foot">
+      <div class="status" id="side-status"><span class="dot"></span><span id="side-status-text">Connecting</span></div>
+      <div class="side-version" id="side-version">kilo-gateway</div>
+    </div>
+  </aside>
+  <main>
+    <header class="topbar">
+      <div>
+        <h2 id="page-title">Overview</h2>
+        <p id="page-sub"></p>
+      </div>
+      <div class="top-actions" id="top-actions"></div>
+    </header>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+
+<div id="modal-host"></div>
+<div id="toasts"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = (sel, root) => (root || document).querySelector(sel);
+  const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+  const TOKEN_KEY = "kg_admin_token";
+  const RANGE_KEY = "kg_range";
+
+  let adminToken = localStorage.getItem(TOKEN_KEY) || "";
+  const state = {
+    page: "overview",
+    range: Number(localStorage.getItem(RANGE_KEY) || 24),
+    models: null,
+    modelsAt: 0,
+    authStatus: null,
+    abort: null,
+    requests: { offset: 0, limit: 50, filters: { q: "", status: "", model: "" } },
+  };
+
+  class ApiError extends Error {
+    constructor(message, status) { super(message); this.name = "ApiError"; this.status = status; }
+  }
+
+  // ---------- formatting ----------
+  const fmt = (n) => {
+    n = Number(n) || 0;
+    if (Math.abs(n) >= 1e9) return (n / 1e9).toFixed(n % 1e9 === 0 ? 0 : 1).replace(/\.0$/, "") + "B";
+    if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(n % 1e6 === 0 ? 0 : 1).replace(/\.0$/, "") + "M";
+    if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(n % 1e3 === 0 ? 0 : 1).replace(/\.0$/, "") + "k";
+    return String(Math.round(n));
+  };
+  const exact = (n) => (Number(n) || 0).toLocaleString("en-US");
+  const ms = (v) => (v == null ? "—" : v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1) + " s" : Math.round(v) + " ms");
+  const pct = (v) => (Number(v) || 0).toFixed(1) + "%";
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const dt = (ts) => new Date(ts).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const timeOnly = (ts) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const dateShort = (ts) => new Date(ts).toLocaleDateString([], { month: "short", day: "numeric" });
+  function ago(ts) {
+    if (!ts) return "never";
+    const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (s < 10) return "just now";
+    if (s < 60) return s + "s ago";
+    if (s < 3600) return Math.floor(s / 60) + "m ago";
+    if (s < 86400) return Math.floor(s / 3600) + "h ago";
+    return Math.floor(s / 86400) + "d ago";
+  }
+  const statusBadge = (s) => {
+    const cls = s === 0 ? "bad" : s < 400 ? "ok" : s === 499 ? "warn" : "bad";
+    return `<span class="badge ${cls}">${s === 0 ? "ERR" : s}</span>`;
+  };
+  const modalBadge = (s) => (s < 400 ? "ok" : s < 500 ? "warn" : "bad");
+
+  // ---------- HTTP ----------
+  async function api(path, opts = {}) {
+    const headers = new Headers(opts.headers || {});
+    if (adminToken) headers.set("x-admin-token", adminToken);
+    if (opts.body && !headers.has("content-type")) headers.set("content-type", "application/json");
+    let res;
+    try {
+      res = await fetch(path, { ...opts, headers });
+    } catch (err) {
+      throw new ApiError("Cannot reach the gateway. Is it running?", 0);
+    }
+    if (res.status === 401) {
+      showLogin("Admin token rejected.");
+      throw new ApiError("Unauthorized", 401);
+    }
+    if (!res.ok) {
+      let detail = res.statusText || "Request failed";
+      try {
+        const payload = await res.json();
+        const e = payload && payload.error;
+        detail = (e && (e.message || e)) || detail;
+      } catch { /* text body */ }
+      throw new ApiError(typeof detail === "string" ? detail : "Request failed", res.status);
+    }
+    const ctype = res.headers.get("content-type") || "";
+    return ctype.includes("application/json") ? res.json() : res.text();
+  }
+
+  function toast(message, kind) {
+    const el = document.createElement("div");
+    el.className = "toast" + (kind ? " " + kind : "");
+    el.textContent = message;
+    $("#toasts").appendChild(el);
+    setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity .25s ease"; setTimeout(() => el.remove(), 260); }, 3200);
+  }
+
+  async function copy(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("Copied to clipboard", "ok");
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); toast("Copied to clipboard", "ok"); } catch { toast("Copy failed", "bad"); }
+      ta.remove();
+    }
+  }
+
+  // ---------- login ----------
+  function showLogin(message) {
+    $("#login").hidden = false;
+    $("#app").hidden = true;
+    $("#login-error").textContent = message || "";
+    setTimeout(() => $("#login-token").focus(), 30);
+  }
+  function hideLogin() { $("#login").hidden = true; }
+
+  $("#login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const token = $("#login-token").value.trim();
+    if (!token) return;
+    adminToken = token;
+    const res = await fetch("/api/health", { headers: { "x-admin-token": token } }).catch(() => null);
+    if (!res || !res.ok) {
+      adminToken = "";
+      $("#login-error").textContent = "That token was rejected.";
+      return;
+    }
+    localStorage.setItem(TOKEN_KEY, token);
+    $("#login-token").value = "";
+    hideLogin();
+    $("#app").hidden = false;
+    route();
+    loadStatus();
+  });
+
+  // ---------- charts ----------
+  let chartSeq = 0;
+  function lineChart(el, series, defs) {
+    if (!el) return;
+    const W = Math.max(240, Math.round(el.clientWidth || 760)), H = 196, L = 42, R = 12, T = 12, B = 24;
+    const iw = W - L - R, ih = H - T - B;
+    const gid = "areaFill" + (++chartSeq);
+    const max = Math.max(1, ...series.flatMap((s) => defs.map((d) => Number(d.value(s)) || 0)));
+    const x = (i) => L + (series.length <= 1 ? iw / 2 : (i / (series.length - 1)) * iw);
+    const y = (v) => T + ih - (Math.max(0, v) / max) * ih;
+    const pretty = (v) => {
+      if (v >= 1e6) return (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+      if (v >= 1e3) return (v / 1e3).toFixed(1).replace(/\.0$/, "") + "k";
+      if (v === 0) return "0";
+      if (v >= 10) return String(Math.round(v));
+      return String(Math.round(v * 10) / 10);
+    };
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="time series">`;
+    svg += `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${defs[0].color}" stop-opacity=".22"/><stop offset="100%" stop-color="${defs[0].color}" stop-opacity="0"/></linearGradient></defs>`;
+    for (let i = 0; i <= 4; i++) {
+      const v = (max * i) / 4;
+      const yy = y(v);
+      svg += `<line class="grid" x1="${L}" y1="${yy}" x2="${W - R}" y2="${yy}"/>`;
+      svg += `<text x="${L - 8}" y="${yy + 3.5}" text-anchor="end">${pretty(v)}</text>`;
+    }
+    const labels = [0, Math.floor((series.length - 1) / 2), series.length - 1].filter((v, i, a) => v >= 0 && a.indexOf(v) === i);
+    labels.forEach((i) => {
+      const s = series[i]; if (!s) return;
+      const text = state.range <= 48 ? new Date(s.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : dateShort(s.ts);
+      const anchor = i === 0 ? "start" : i === series.length - 1 ? "end" : "middle";
+      svg += `<text x="${x(i)}" y="${H - 6}" text-anchor="${anchor}">${esc(text)}</text>`;
+    });
+    const first = defs[0];
+    const pts = series.map((s, i) => `${x(i).toFixed(1)},${y(Number(first.value(s)) || 0).toFixed(1)}`);
+    if (pts.length > 1) svg += `<path d="M${pts.join(" L")} L${x(series.length - 1)},${T + ih} L${x(0)},${T + ih} Z" fill="url(#${gid})"/>`;
+    defs.forEach((d) => {
+      const points = series.map((s, i) => `${x(i).toFixed(1)},${y(Number(d.value(s)) || 0).toFixed(1)}`).join(" ");
+      svg += `<polyline points="${points}" fill="none" stroke="${d.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      const last = series[series.length - 1];
+      if (last) svg += `<circle cx="${x(series.length - 1)}" cy="${y(Number(d.value(last)) || 0)}" r="3" fill="${d.color}"/>`;
+      if (series.length && series.length <= 160) {
+        series.forEach((s, i) => {
+          const label = `${dt(s.ts)}: ${exact(d.value(s))}`;
+          svg += `<circle cx="${x(i)}" cy="${y(Number(d.value(s)) || 0)}" r="6" fill="transparent"><title>${esc(label)}</title></circle>`;
+        });
+      }
+    });
+    svg += "</svg>";
+    el.innerHTML = svg;
+  }
+
+  // ---------- tables ----------
+  function modelCell(id, sub) {
+    return `<div class="cell-main mono truncate" title="${esc(id)}">${esc(id || "unknown")}</div>` +
+      (sub ? `<div class="cell-sub">${esc(sub)}</div>` : "");
+  }
+
+  function requestsTable(rows, columns) {
+    if (!rows.length) return `<tr><td class="empty" colspan="${columns.length}">No requests match this view yet.</td></tr>`;
+    return rows.map((r) => {
+      const cells = columns.map((c) => `<td class="${c.cls || ""}">${c.render(r)}</td>`).join("");
+      return `<tr class="clickable" data-request="${esc(r.id)}">${cells}</tr>`;
+    }).join("");
+  }
+
+  function bindRequestRows(root) {
+    root.addEventListener("click", (e) => {
+      const tr = e.target.closest("[data-request]");
+      if (tr) openRequest(tr.getAttribute("data-request"));
+    });
+  }
+
+  async function openRequest(id) {
+    let row;
+    try { row = (await api("/api/requests/" + encodeURIComponent(id))).request; }
+    catch (err) { toast(err.message, "bad"); return; }
+    if (!row) return;
+    const pairs = [
+      ["Request id", row.id], ["Time", new Date(row.ts).toISOString()], ["Method", row.method], ["Path", row.path],
+      ["Model", row.model || "—"], ["Status", String(row.status)], ["Upstream status", row.upstream_status ?? "—"],
+      ["Stream", row.stream ? "yes" : "no"], ["Duration", ms(row.duration_ms)], ["Time to first byte", ms(row.ttft_ms)],
+      ["Prompt tokens", exact(row.prompt_tokens)], ["Completion tokens", exact(row.completion_tokens)],
+      ["Total tokens", exact(row.total_tokens)], ["Cost (USD)", row.cost_usd ?? "—"],
+      ["Key", row.key_name || "—"], ["Source", row.source], ["Client", row.client || "—"],
+    ];
+    const detail = `<div class="detail-grid">${pairs.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</div>` +
+      (row.error ? `<div class="error-box" style="margin-top:14px"><strong>Error</strong><br>${esc(row.error)}</div>` : "");
+    modal({ title: "Request detail", body: detail, wide: true, actions: `<button data-close>Close</button>` });
+  }
+
+  // ---------- modal ----------
+  let closeModalFn = null;
+  function modal({ title, body, actions, wide }) {
+    closeModal();
+    const host = $("#modal-host");
+    host.innerHTML = `<div class="modal-backdrop"><div class="modal ${wide ? "wide" : ""}" role="dialog" aria-modal="true">
+      <h3>${esc(title)}</h3>${body}${actions ? `<div class="modal-actions">${actions}</div>` : ""}
+    </div></div>`;
+    host.hidden = false;
+    host.querySelector(".modal-backdrop").addEventListener("click", (e) => { if (e.target.classList.contains("modal-backdrop")) closeModal(); });
+    host.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", closeModal));
+    closeModalFn = closeModal;
+    setTimeout(() => { const focusable = host.querySelector("input, select, textarea, button.primary"); if (focusable) focusable.focus(); }, 30);
+    return host.querySelector(".modal");
+  }
+  function closeModal() {
+    const host = $("#modal-host");
+    host.hidden = true;
+    host.innerHTML = "";
+    closeModalFn = null;
+  }
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && closeModalFn) closeModalFn(); });
+
+  // ---------- page framework ----------
+  const RANGE_LABELS = { 1: "1h", 24: "24h", 168: "7d", 720: "30d" };
+
+  function rangeActions(host) {
+    host.innerHTML = `<div class="seg" id="range-control">${[1, 24, 168, 720].map((h) =>
+      `<button data-range="${h}" class="${state.range === h ? "active" : ""}">${RANGE_LABELS[h]}</button>`).join("")}</div>
+      <button class="ghost" id="refresh-page" title="Refresh">&#8635;</button>`;
+    $$("#range-control button", host).forEach((b) => b.addEventListener("click", () => {
+      state.range = Number(b.getAttribute("data-range"));
+      localStorage.setItem(RANGE_KEY, String(state.range));
+      renderPage();
+    }));
+    $("#refresh-page", host).addEventListener("click", renderPage);
+  }
+
+  const PAGES = {
+    overview: {
+      title: "Overview",
+      sub: "Traffic, token usage and model activity across the gateway.",
+      actions: rangeActions,
+      render: renderOverview,
+    },
+    playground: {
+      title: "Playground",
+      sub: "Send a completion through the gateway and watch the free tier respond.",
+      render: renderPlayground,
+    },
+    models: {
+      title: "Models",
+      sub: "Live free-model catalog served from Kilo Gateway.",
+      actions(host) {
+        host.innerHTML = `<button class="ghost" id="refresh-catalog" title="Refresh catalog">&#8635; Refresh</button>`;
+        $("#refresh-catalog", host).addEventListener("click", async () => {
+          toast("Refreshing catalog…");
+          state.models = null;
+          try { await api("/api/models?refresh=1"); renderPage(); } catch (err) { toast(err.message, "bad"); }
+        });
+      },
+      render: renderModels,
+    },
+    keys: {
+      title: "API keys",
+      sub: "Gateway credentials, quotas and per-key usage.",
+      actions(host) {
+        host.innerHTML = `<button class="primary" id="create-key">+ Create key</button>`;
+        $("#create-key", host).addEventListener("click", openCreateKey);
+      },
+      render: renderKeys,
+    },
+    requests: {
+      title: "Requests",
+      sub: "Every proxied call, with latency and token accounting.",
+      render: renderRequests,
+    },
+    settings: {
+      title: "Settings",
+      sub: "Runtime configuration, integration snippets and data controls.",
+      render: renderSettings,
+    },
+  };
+
+  function renderPage() {
+    const page = PAGES[state.page] ? state.page : "overview";
+    state.page = page;
+    const def = PAGES[page];
+    $("#page-title").textContent = def.title;
+    $("#page-sub").textContent = def.sub;
+    const actions = $("#top-actions");
+    actions.innerHTML = "";
+    if (def.actions) def.actions(actions);
+    $$("#nav a").forEach((a) => a.classList.toggle("active", a.getAttribute("data-page") === page));
+    const previous = $("#view");
+    const view = previous.cloneNode(false);
+    previous.replaceWith(view);
+    view.innerHTML = `<div class="loading"><span class="spinner"></span>Loading ${esc(def.title.toLowerCase())}…</div>`;
+    def.render(view).catch((err) => {
+      if (err instanceof ApiError && err.status === 401) return;
+      view.innerHTML = `<div class="error-box"><strong>Could not load this page.</strong><br>${esc(err.message)}</div>`;
+    });
+  }
+
+  function route() {
+    const raw = (location.hash || "#overview").slice(1);
+    state.page = raw.split("?")[0] || "overview";
+    renderPage();
+  }
+
+  async function loadStatus() {
+    const el = $("#side-status");
+    const text = $("#side-status-text");
+    try {
+      const h = await api("/api/health");
+      el.className = "status ok";
+      text.textContent = `${h.catalog.count} free models`;
+      $("#side-version").textContent = `kilo-gateway v${h.version}`;
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) return;
+      el.className = "status bad";
+      text.textContent = "Gateway unreachable";
+    }
+  }
+
+  // ---------- overview ----------
+  async function renderOverview(view) {
+    const data = await api(`/api/overview?hours=${state.range}`);
+    const t = data.totals;
+    const errorRate = t.requests ? (t.errors / t.requests) * 100 : 0;
+    const catalogHint = data.catalog.error
+      ? `catalog error: ${esc(data.catalog.error)}`
+      : `${exact(data.catalog.count)} free models · ${exact(data.catalog.total)} upstream`;
+    view.innerHTML = `
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 18V9m5 9V5m5 13v-6m5 6V7" stroke-linecap="round"/></svg>Requests</div>
+          <div class="value">${exact(t.requests)}</div>
+          <div class="foot">${t.errors ? `<span style="color:var(--bad)">${exact(t.errors)} errors</span>` : `<span style="color:var(--ok)">no errors</span>`} · ${pct(errorRate)}</div>
+        </div>
+        <div class="stat">
+          <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h10M4 17h13" stroke-linecap="round"/></svg>Tokens</div>
+          <div class="value">${fmt(t.total_tokens)}</div>
+          <div class="foot">${fmt(t.prompt_tokens)} in · ${fmt(t.completion_tokens)} out</div>
+        </div>
+        <div class="stat">
+          <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6" stroke-linecap="round"/></svg>Latency</div>
+          <div class="value">${ms(t.avg_ms)}</div>
+          <div class="foot">p95 ${ms(t.p95_ms)} · ${exact(t.streams)} streamed</div>
+        </div>
+        <div class="stat">
+          <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l2 2M14 9l2 2" stroke-linecap="round"/></svg>API keys</div>
+          <div class="value">${exact(data.keys.active)}</div>
+          <div class="foot">${exact(data.keys.total)} total · ${data.server.require_key ? "required" : "optional"}</div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:14px">
+        <section class="card">
+          <div class="card-head"><h3>Request volume</h3>
+            <div class="legend"><span><i style="background:var(--c1)"></i>Requests</span><span><i style="background:var(--bad)"></i>Errors</span></div>
+          </div>
+          <div class="chart" id="chart-requests"></div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h3>Token throughput</h3>
+            <div class="legend"><span><i style="background:var(--c1)"></i>Input</span><span><i style="background:var(--c2)"></i>Output</span></div>
+          </div>
+          <div class="chart" id="chart-tokens"></div>
+        </section>
+      </div>
+
+      <div class="grid-3" style="margin-top:14px">
+        <section class="card">
+          <div class="card-head"><h3>Recent requests</h3><a class="small" href="#requests">View all</a></div>
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th>Time</th><th>Model</th><th>Status</th><th class="num">Latency</th><th class="num">Tokens</th></tr></thead>
+              <tbody>${requestsTable(data.recent, [
+                { render: (r) => `<span class="mono muted">${esc(timeOnly(r.ts))}</span>` },
+                { render: (r) => modelCell(r.model || r.path, r.key_name || "") },
+                { render: (r) => statusBadge(r.status) },
+                { cls: "num", render: (r) => ms(r.duration_ms) },
+                { cls: "num", render: (r) => exact(r.total_tokens) },
+              ])}</tbody>
+            </table>
+          </div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h3>Top models</h3><span class="hint">${esc(catalogHint)}</span></div>
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th>Model</th><th class="num">Calls</th><th class="num">Tokens</th><th class="num">Avg</th></tr></thead>
+              <tbody>${data.models.length ? data.models.map((m) => `
+                <tr><td>${modelCell(m.model)}</td><td class="num">${exact(m.requests)}</td><td class="num">${fmt(m.total_tokens)}</td><td class="num">${ms(m.avg_ms)}</td></tr>`).join("")
+                : `<tr><td colspan="4" class="empty">No model traffic in this range.</td></tr>`}</tbody>
+            </table>
+          </div>
+        </section>
+      </div>`;
+
+    lineChart($("#chart-requests", view), data.series, [
+      { value: (s) => s.requests, color: "var(--c1)" },
+      { value: (s) => s.errors, color: "var(--bad)" },
+    ]);
+    lineChart($("#chart-tokens", view), data.series, [
+      { value: (s) => s.prompt_tokens, color: "var(--c1)" },
+      { value: (s) => s.completion_tokens, color: "var(--c2)" },
+    ]);
+    bindRequestRows(view);
+  }
+
+  // ---------- playground ----------
+  async function getModels(force) {
+    if (!force && state.models && Date.now() - state.modelsAt < 300000) return state.models;
+    const data = await api("/api/models" + (force ? "?refresh=1" : ""));
+    state.models = data.data;
+    state.modelsAt = Date.now();
+    return state.models;
+  }
+
+  async function renderPlayground(view) {
+    let models = [];
+    let modelError = "";
+    try { models = await getModels(); } catch (err) { modelError = err.message; }
+    const requested = sessionStorage.getItem("kg_play_model");
+    sessionStorage.removeItem("kg_play_model");
+    const preferred = models.find((m) => m.id === requested) || models.find((m) => m.id === "kilo-auto/free") || models[0];
+    view.innerHTML = `
+      <div class="playgrid">
+        <section class="card stack" style="gap:14px">
+          <label class="field">Model
+            <select id="pg-model">${models.map((m) => `<option value="${esc(m.id)}" ${preferred && m.id === preferred.id ? "selected" : ""}>${esc(m.id)}</option>`).join("") || `<option value="">No models available</option>`}</select>
+          </label>
+          <div class="row" style="gap:12px">
+            <label class="field grow">Temperature <input id="pg-temp" type="number" min="0" max="2" step="0.1" value="0.7"></label>
+            <label class="field grow">Max tokens <input id="pg-max" type="number" min="0" max="1000000" step="1" placeholder="auto"></label>
+          </div>
+          <label class="field">System prompt <textarea id="pg-system" rows="2" placeholder="Optional system message"></textarea></label>
+          <label class="field">Message <textarea id="pg-prompt" rows="7" placeholder="Ask something…"></textarea></label>
+          <div class="row" style="justify-content:space-between">
+            <label class="check"><input type="checkbox" id="pg-stream" checked> Stream response</label>
+            <div class="row" style="gap:8px">
+              <button class="ghost" id="pg-clear">Clear</button>
+              <button class="primary" id="pg-send">Send</button>
+            </div>
+          </div>
+          ${modelError ? `<div class="warn-box">Catalog: ${esc(modelError)}</div>` : ""}
+        </section>
+        <section class="card">
+          <div class="card-head"><h3>Response</h3><span class="hint" id="pg-meta"></span></div>
+          <div class="output" id="pg-output"><span class="placeholder">The completion appears here. Requests are proxied live and logged under “dashboard”.</span></div>
+          <div class="meta-line" id="pg-status"></div>
+        </section>
+      </div>`;
+
+    const output = $("#pg-output", view);
+    const status = $("#pg-status", view);
+    const sendBtn = $("#pg-send", view);
+    const setOut = (text, placeholder) => {
+      output.innerHTML = "";
+      if (placeholder) { output.innerHTML = `<span class="placeholder">${esc(placeholder)}</span>`; return; }
+      output.textContent = text;
+    };
+    $("#pg-clear", view).addEventListener("click", () => { setOut("", "Cleared."); status.textContent = ""; });
+    $("#pg-prompt", view).addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") send(); });
+
+    async function send() {
+      const model = $("#pg-model", view).value;
+      const prompt = $("#pg-prompt", view).value.trim();
+      if (!model) { toast(modelError || "No model available", "bad"); return; }
+      if (!prompt) { toast("Write a message first", "bad"); return; }
+      if (state.abort) return;
+      const stream = $("#pg-stream", view).checked;
+      const messages = [];
+      const system = $("#pg-system", view).value.trim();
+      if (system) messages.push({ role: "system", content: system });
+      messages.push({ role: "user", content: prompt });
+      const body = { model, messages, stream };
+      const temp = parseFloat($("#pg-temp", view).value);
+      if (Number.isFinite(temp)) body.temperature = temp;
+      const maxTokens = parseInt($("#pg-max", view).value, 10);
+      if (Number.isFinite(maxTokens) && maxTokens > 0) body.max_tokens = maxTokens;
+
+      const ctrl = new AbortController();
+      state.abort = ctrl;
+      sendBtn.disabled = true;
+      sendBtn.textContent = "Stop";
+      sendBtn.onclick = () => ctrl.abort();
+      setOut("", "Waiting for upstream…");
+      status.textContent = "";
+      const started = performance.now();
+      let usage = null;
+      let text = "";
+      let reasoning = "";
+      try {
+        const res = await fetch("/api/play/chat/completions", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-gateway-source": "dashboard",
+            ...(adminToken ? { "x-admin-token": adminToken } : {}),
+          },
+          body: JSON.stringify(body),
+          signal: ctrl.signal,
+        });
+        if (!res.ok) {
+          let detail = res.statusText;
+          try {
+            const payload = await res.json();
+            detail = (payload.error && (payload.error.message || payload.error)) || detail;
+          } catch { /* ignore */ }
+          throw new Error(typeof detail === "string" ? detail : "HTTP " + res.status);
+        }
+        if (!stream || !(res.headers.get("content-type") || "").includes("event-stream")) {
+          const payload = await res.json();
+          const choice = payload.choices && payload.choices[0];
+          const message = choice && choice.message;
+          text = (message && message.content) || "";
+          reasoning = (message && message.reasoning) || "";
+          usage = payload.usage || null;
+          setOut(text || (reasoning ? "[reasoning only, no answer content]\n\n" + reasoning : "(empty response)"));
+        } else {
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buf = "";
+          let firstChunk = true;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            let idx;
+            while ((idx = buf.indexOf("\n")) >= 0) {
+              const line = buf.slice(0, idx).trim();
+              buf = buf.slice(idx + 1);
+              if (!line.startsWith("data:")) continue;
+              const chunk = line.slice(5).trim();
+              if (!chunk || chunk === "[DONE]") continue;
+              try {
+                const j = JSON.parse(chunk);
+                const delta = j.choices && j.choices[0] && j.choices[0].delta;
+                if (delta && typeof delta.reasoning === "string" && delta.reasoning) {
+                  reasoning += delta.reasoning;
+                  if (!text) { setOut(reasoning); firstChunk = false; }
+                }
+                if (delta && typeof delta.content === "string" && delta.content) {
+                  text += delta.content;
+                  if (firstChunk) { setOut(text); firstChunk = false; } else output.textContent = text;
+                }
+                if (j.usage) usage = j.usage;
+              } catch { /* keep-alive / partial frame */ }
+            }
+          }
+          if (!text) setOut("(empty stream)");
+        }
+        const elapsed = performance.now() - started;
+        const usageText = usage
+          ? `${exact(usage.prompt_tokens || usage.input_tokens || 0)} in · ${exact(usage.completion_tokens || usage.output_tokens || 0)} out`
+          : "usage not reported";
+        status.innerHTML = `<span class="badge ok">200</span><span>${esc(model)}</span><span>·</span><span>${ms(elapsed)}</span><span>·</span><span>${usageText}</span>`;
+      } catch (err) {
+        const message = err.name === "AbortError" ? "Stopped by user." : err.message || String(err);
+        if (text) output.textContent = text + "\n\n[" + message + "]";
+        else output.innerHTML = `<span class="placeholder" style="color:var(--bad)">${esc(message)}</span>`;
+        status.innerHTML = `<span class="badge bad">${err.name === "AbortError" ? "stopped" : "error"}</span>`;
+      } finally {
+        state.abort = null;
+        sendBtn.disabled = false;
+        sendBtn.textContent = "Send";
+        sendBtn.onclick = send;
+      }
+    }
+    sendBtn.onclick = send;
+  }
+
+  // ---------- models ----------
+  async function renderModels(view) {
+    let data;
+    try { data = await api("/api/models"); } catch (err) { throw err; }
+    state.models = data.data;
+    state.modelsAt = Date.now();
+    const fetched = data.fetched_at ? ago(data.fetched_at) : "never";
+    view.innerHTML = `
+      ${data.error ? `<div class="warn-box" style="margin-bottom:14px">Upstream catalog refresh failed: ${esc(data.error)}${data.data.length ? " — showing the last good snapshot." : ""}</div>` : ""}
+      <div class="keys-toolbar">
+        <div class="grow"><input id="model-search" placeholder="Filter by model, provider or modality…" aria-label="Filter models"></div>
+        <span class="faint small">${exact(data.free_count)} free of ${exact(data.kilo_total)} upstream · refreshed ${esc(fetched)}</span>
+      </div>
+      <div class="table-wrap table-scroll">
+        <table class="data">
+          <thead><tr><th>Model</th><th>Modalities</th><th class="num">Context</th><th class="num">Max out</th><th class="num">Calls (30d)</th><th class="num">Tokens (30d)</th><th></th></tr></thead>
+          <tbody id="models-body"></tbody>
+        </table>
+      </div>`;
+    const body = $("#models-body", view);
+    const draw = (query) => {
+      const q = (query || "").toLowerCase();
+      const rows = data.data.filter((m) => !q || (m.id + " " + m.name + " " + m.input_modalities.join(" ") + " " + m.description).toLowerCase().includes(q));
+      body.innerHTML = rows.length ? rows.map((m) => `
+        <tr>
+          <td>
+            <div class="cell-main mono truncate" title="${esc(m.id)}">${esc(m.id)}</div>
+            <div class="cell-sub truncate">${esc(m.name)}${m.description ? " — " + esc(m.description) : ""}</div>
+          </td>
+          <td>${m.input_modalities.map((x) => `<span class="tag">${esc(x)}</span>`).join(" ")}</td>
+          <td class="num">${m.context_length ? fmt(m.context_length) : "—"}</td>
+          <td class="num">${m.max_completion_tokens ? fmt(m.max_completion_tokens) : "—"}</td>
+          <td class="num">${exact(m.usage.requests)}</td>
+          <td class="num">${fmt(m.usage.total_tokens)}</td>
+          <td><button class="sm" data-play="${esc(m.id)}">Test</button> <button class="sm ghost" data-copy="${esc(m.id)}" title="Copy model id">Copy</button></td>
+        </tr>`).join("") : `<tr><td colspan="7" class="empty">No models match “${esc(query)}”.</td></tr>`;
+    };
+    draw("");
+    $("#model-search", view).addEventListener("input", (e) => draw(e.target.value));
+    body.addEventListener("click", (e) => {
+      const copyBtn = e.target.closest("[data-copy]");
+      if (copyBtn) { copy(copyBtn.getAttribute("data-copy")); return; }
+      const play = e.target.closest("[data-play]");
+      if (play) {
+        sessionStorage.setItem("kg_play_model", play.getAttribute("data-play"));
+        location.hash = "#playground";
+      }
+    });
+  }
+
+  // ---------- keys ----------
+  async function renderKeys(view) {
+    const data = await api("/api/keys");
+    const keys = data.keys;
+    view.innerHTML = `
+      <div class="warn-box" style="margin-bottom:14px">
+        Gateway keys are shown once at creation and stored hashed. Send them as <code>Authorization: Bearer &lt;key&gt;</code>.
+        ${state.authStatus && state.authStatus.key_required ? "Keys are currently <strong>required</strong> for /v1." : "Keys are optional; requests without one still reach the free tier."}
+      </div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Name</th><th>Limits</th><th class="num">Today</th><th class="num">All time</th><th>Last used</th><th>Status</th><th></th></tr></thead>
+          <tbody>${keys.length ? keys.map((k) => `
+            <tr>
+              <td><div class="cell-main">${esc(k.name)}</div><div class="cell-sub mono">${esc(k.prefix)}…</div></td>
+              <td><span class="small muted">${k.rpm ? esc(k.rpm) + " rpm" : "rpm ∞"} · ${k.daily_limit ? exact(k.daily_limit) + "/day" : "requests ∞"}${k.has_upstream_key ? ` · <span class="tag">upstream key</span>` : ""}</span></td>
+              <td class="num">${exact(k.usage.today_requests)}<div class="cell-sub">${fmt(k.usage.today_tokens)} tok</div></td>
+              <td class="num">${exact(k.usage.requests)}<div class="cell-sub">${fmt(k.usage.total_tokens)} tok</div></td>
+              <td class="small muted">${esc(ago(k.last_used_at))}</td>
+              <td>${k.revoked ? `<span class="badge bad">revoked</span>` : `<span class="badge ok">active</span>`}</td>
+              <td class="num">${k.revoked
+                ? `<button class="sm ghost" data-key-enable="${esc(k.id)}">Enable</button>`
+                : `<button class="sm" data-key-revoke="${esc(k.id)}">Revoke</button>`}
+                <button class="sm ghost" data-key-delete="${esc(k.id)}" title="Delete permanently">✕</button></td>
+            </tr>`).join("") : `<tr><td colspan="7" class="empty">No gateway keys yet. Create one to attribute and limit traffic.</td></tr>`}
+          </tbody>
+        </table>
+      </div>`;
+    view.addEventListener("click", async (e) => {
+      const revoke = e.target.closest("[data-key-revoke]");
+      const enable = e.target.closest("[data-key-enable]");
+      const del = e.target.closest("[data-key-delete]");
+      try {
+        if (revoke) {
+          if (!confirm("Revoke this key? Requests using it will be rejected.")) return;
+          await api("/api/keys/" + revoke.getAttribute("data-key-revoke"), { method: "PATCH", body: JSON.stringify({ revoked: true }) });
+          toast("Key revoked", "ok"); renderPage();
+        } else if (enable) {
+          await api("/api/keys/" + enable.getAttribute("data-key-enable"), { method: "PATCH", body: JSON.stringify({ revoked: false }) });
+          toast("Key enabled", "ok"); renderPage();
+        } else if (del) {
+          if (!confirm("Delete this key permanently? Usage history is kept.")) return;
+          await api("/api/keys/" + del.getAttribute("data-key-delete"), { method: "DELETE" });
+          toast("Key deleted", "ok"); renderPage();
+        }
+      } catch (err) { toast(err.message, "bad"); }
+    });
+  }
+
+  function openCreateKey() {
+    modal({
+      title: "Create API key",
+      body: `<p>The secret is displayed once. Limits of 0 mean unlimited.</p>
+        <div class="form-grid">
+          <label class="field full">Name <input id="nk-name" placeholder="Work laptop" maxlength="60" autofocus></label>
+          <label class="field">Requests per minute <input id="nk-rpm" type="number" min="0" step="1" placeholder="0"></label>
+          <label class="field">Requests per day <input id="nk-daily" type="number" min="0" step="1" placeholder="0"></label>
+          <label class="field full">Upstream Kilo key <span class="small faint" style="font-weight:400">Optional — attaches a real sk-/pk- key for paid models</span>
+            <input id="nk-upstream" type="password" placeholder="sk-…" autocomplete="off"></label>
+        </div>`,
+      actions: `<button data-close>Cancel</button><button class="primary" id="nk-submit">Create key</button>`,
+    });
+    $("#nk-submit").addEventListener("click", async () => {
+      const btn = $("#nk-submit");
+      btn.disabled = true; btn.textContent = "Creating…";
+      try {
+        const payload = await api("/api/keys", {
+          method: "POST",
+          body: JSON.stringify({
+            name: $("#nk-name").value.trim() || "API key",
+            rpm: Number($("#nk-rpm").value) || 0,
+            daily_limit: Number($("#nk-daily").value) || 0,
+            upstream_key: $("#nk-upstream").value.trim(),
+          }),
+        });
+        closeModal();
+        showSecret(payload.secret, payload.key);
+        renderPage();
+      } catch (err) {
+        btn.disabled = false; btn.textContent = "Create key";
+        toast(err.message, "bad");
+      }
+    });
+  }
+
+  function showSecret(secret, key) {
+    modal({
+      title: "Key created",
+      body: `<p><strong>${esc(key.name)}</strong> · this secret is not recoverable.</p>
+        <div class="secret-box"><code id="new-secret">${esc(secret)}</code><button class="sm" id="copy-secret">Copy</button></div>
+        <p class="small">Use it as <code>Authorization: Bearer ${esc(key.prefix)}…</code> or <code>x-api-key</code>.</p>`,
+      actions: `<button class="primary" data-close>Done</button>`,
+    });
+    $("#copy-secret").addEventListener("click", () => copy(secret));
+  }
+
+  // ---------- requests ----------
+  async function renderRequests(view) {
+    const f = state.requests.filters;
+    const params = new URLSearchParams({ limit: String(state.requests.limit), offset: String(state.requests.offset) });
+    if (f.q) params.set("q", f.q);
+    if (f.status) params.set("status", f.status);
+    if (f.model) params.set("model", f.model);
+    const data = await api("/api/requests?" + params.toString());
+    const shown = data.requests.length;
+    view.innerHTML = `
+      <div class="keys-toolbar">
+        <div class="grow"><input id="req-search" placeholder="Search model, path, key or error…" value="${esc(f.q)}" aria-label="Search requests"></div>
+        <select id="req-status" class="filter-select" aria-label="Status filter">
+          <option value="">All statuses</option>
+          <option value="ok" ${f.status === "ok" ? "selected" : ""}>Success</option>
+          <option value="error" ${f.status === "error" ? "selected" : ""}>Errors</option>
+        </select>
+        <select id="req-model" class="filter-select" aria-label="Model filter">
+          <option value="">All models</option>
+          ${data.available_models.map((m) => `<option value="${esc(m)}" ${f.model === m ? "selected" : ""}>${esc(m)}</option>`).join("")}
+        </select>
+        <button id="req-export">Export CSV</button>
+        <button class="danger" id="req-clear">Clear logs</button>
+      </div>
+      <div class="table-wrap table-scroll">
+        <table class="data">
+          <thead><tr><th>Time</th><th>Model</th><th>Status</th><th class="num">Latency</th><th class="num">Tokens</th><th>Key</th><th>Source</th><th>Path</th></tr></thead>
+          <tbody>${requestsTable(data.requests, [
+            { render: (r) => `<span class="mono muted">${esc(dateShort(r.ts))} ${esc(timeOnly(r.ts))}</span>` },
+            { render: (r) => modelCell(r.model || "—") },
+            { render: (r) => statusBadge(r.status) + (r.stream ? ` <span class="tag">sse</span>` : "") },
+            { cls: "num", render: (r) => ms(r.duration_ms) + (r.ttft_ms != null ? `<div class="cell-sub">ttft ${ms(r.ttft_ms)}</div>` : "") },
+            { cls: "num", render: (r) => exact(r.total_tokens) + `<div class="cell-sub">${fmt(r.prompt_tokens)} in / ${fmt(r.completion_tokens)} out</div>` },
+            { render: (r) => `<span class="small muted">${esc(r.key_name || "—")}</span>` },
+            { render: (r) => `<span class="tag">${esc(r.source)}</span>` },
+            { render: (r) => `<span class="small mono muted truncate" style="display:inline-block;max-width:180px" title="${esc(r.path)}">${esc(r.path)}</span>` },
+          ])}</tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span>${exact(data.total)} matching requests · showing ${exact(state.requests.offset + 1)}–${exact(state.requests.offset + shown)}</span>
+        <div class="row" style="gap:8px">
+          <button class="sm" id="req-prev" ${state.requests.offset === 0 ? "disabled" : ""}>← Previous</button>
+          <button class="sm" id="req-next" ${state.requests.offset + shown >= data.total ? "disabled" : ""}>Next →</button>
+        </div>
+      </div>`;
+
+    const reload = () => { renderPage(); };
+    const applySearch = () => {
+      const next = $("#req-search", view).value.trim();
+      if (next === f.q) return;
+      f.q = next;
+      state.requests.offset = 0;
+      reload();
+    };
+    $("#req-search", view).addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); applySearch(); }
+    });
+    $("#req-search", view).addEventListener("change", applySearch);
+    $("#req-status", view).addEventListener("change", (e) => { f.status = e.target.value; state.requests.offset = 0; reload(); });
+    $("#req-model", view).addEventListener("change", (e) => { f.model = e.target.value; state.requests.offset = 0; reload(); });
+    $("#req-prev", view).addEventListener("click", () => { state.requests.offset = Math.max(0, state.requests.offset - state.requests.limit); reload(); });
+    $("#req-next", view).addEventListener("click", () => { state.requests.offset += state.requests.limit; reload(); });
+    $("#req-export", view).addEventListener("click", async () => {
+      const q = new URLSearchParams();
+      if (f.q) q.set("q", f.q);
+      if (f.status) q.set("status", f.status);
+      if (f.model) q.set("model", f.model);
+      try {
+        const res = await fetch("/api/export.csv?" + q.toString(), { headers: adminToken ? { "x-admin-token": adminToken } : {} });
+        if (!res.ok) throw new Error("Export failed (HTTP " + res.status + ")");
+        const blob = await res.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "kilo-gateway-requests.csv";
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        toast("Export downloaded", "ok");
+      } catch (err) { toast(err.message, "bad"); }
+    });
+    $("#req-clear", view).addEventListener("click", async () => {
+      if (!confirm("Delete all request logs? Usage counters derived from them are reset. This cannot be undone.")) return;
+      try {
+        const res = await api("/api/requests", { method: "DELETE" });
+        toast(`Deleted ${exact(res.deleted)} rows`, "ok");
+        state.requests.offset = 0;
+        renderPage();
+      } catch (err) { toast(err.message, "bad"); }
+    });
+    bindRequestRows(view);
+  }
+
+  // ---------- settings ----------
+  async function renderSettings(view) {
+    const [cfg, health] = await Promise.all([api("/api/config"), api("/api/health").catch(() => null)]);
+    const origin = location.origin;
+    const needsKey = cfg.require_key;
+    const sampleKey = needsKey ? "<gateway-key>" : "unused";
+    const curl = `curl ${origin}/v1/chat/completions \\\n  -H "Content-Type: application/json" \\\n  ${needsKey ? `-H "Authorization: Bearer ${sampleKey}" \\\n  ` : ""}-d '{"model":"kilo-auto/free","messages":[{"role":"user","content":"hi"}]}'`;
+    const defs = [
+      ["Version", "v" + cfg.version],
+      ["Uptime", ms(cfg.uptime_ms)],
+      ["Upstream", cfg.upstream],
+      ["Listen", cfg.host + ":" + cfg.port],
+      ["Database", cfg.database_bytes ? (cfg.database_bytes / 1048576).toFixed(2) + " MB" : "—"],
+      ["Retention", cfg.retention_days ? cfg.retention_days + " days" : "disabled"],
+      ["Admin auth", cfg.admin_required ? "ADMIN_TOKEN" : "open"],
+      ["Client keys", cfg.require_key ? "required" : "optional"],
+      ["Catalog cache", cfg.catalog_ttl_ms / 1000 + " s"],
+      ["Upstream timeout", cfg.upstream_timeout_ms / 1000 + " s"],
+      ["Max body", (cfg.max_body_bytes / 1048576).toFixed(1) + " MB"],
+      ["CORS origin", cfg.cors_origin],
+    ];
+    const catalog = health ? health.catalog : null;
+    view.innerHTML = `
+      <div class="grid-2">
+        <section class="card">
+          <div class="card-head"><h3>Runtime</h3><span class="hint">${catalog ? `${exact(catalog.count)} free · ${exact(catalog.total)} total` : ""}</span></div>
+          <dl class="def-grid">${defs.map(([k, v]) => `<div class="def"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>
+        </section>
+        <section class="card">
+          <div class="card-head"><h3>Connect a client</h3><span class="hint">${needsKey ? "key required" : "keyless free tier"}</span></div>
+          <p class="small muted">Point any OpenAI- or Anthropic-compatible client at this gateway.</p>
+          <div class="snippet"><button class="sm ghost" data-copy="base">Copy</button><pre>Base URL: ${esc(origin)}/v1
+API key:  ${needsKey ? "a gateway key from the API keys page" : "not required for free models"}</pre></div>
+          <div class="snippet"><button class="sm ghost" data-copy="curl">Copy</button><pre>${esc(curl)}</pre></div>
+          <div class="snippet"><button class="sm ghost" data-copy="env">Copy</button><pre>OPENAI_BASE_URL=${esc(origin)}/v1
+OPENAI_API_KEY=${needsKey ? "<gateway-key>" : "unused"}</pre></div>
+          <div class="snippet"><button class="sm ghost" data-copy="anthropic">Copy</button><pre>ANTHROPIC_BASE_URL=${esc(origin)}
+ANTHROPIC_AUTH_TOKEN=${needsKey ? "<gateway-key>" : "unused"}</pre></div>
+        </section>
+      </div>
+
+      <div class="grid-2" style="margin-top:14px">
+        <section class="card">
+          <div class="card-head"><h3>Catalog</h3></div>
+          <dl class="def-grid">
+            <div class="def"><dt>Free models</dt><dd>${catalog ? exact(catalog.count) : "—"}</dd></div>
+            <div class="def"><dt>Upstream models</dt><dd>${catalog ? exact(catalog.total) : "—"}</dd></div>
+            <div class="def"><dt>Last refresh</dt><dd>${catalog && catalog.fetched_at ? esc(ago(catalog.fetched_at)) : "never"}</dd></div>
+            <div class="def"><dt>Last error</dt><dd style="color:${catalog && catalog.error ? "var(--bad)" : "inherit"}">${catalog && catalog.error ? esc(catalog.error) : "none"}</dd></div>
+          </dl>
+          <div class="row" style="margin-top:14px">
+            <button id="ttl-refresh">Refresh catalog</button>
+            <button id="export-all">Export all requests</button>
+          </div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h3>Access & data</h3></div>
+          <p class="small muted">Admin token protects this dashboard API. Set <code>ADMIN_TOKEN</code> in the environment; sessions are per browser.</p>
+          <div class="row" style="margin-top:14px">
+            ${cfg.admin_required ? `<button id="logout">Lock dashboard</button>` : ""}
+            <button class="danger" id="clear-all">Delete request logs</button>
+          </div>
+          <div class="snippet" style="margin-top:14px"><button class="sm ghost" data-copy="admin">Copy</button><pre>curl ${esc(origin)}/api/overview \\\n  -H "x-admin-token: ${cfg.admin_required ? "<ADMIN_TOKEN>" : ""}"</pre></div>
+        </section>
+      </div>`;
+
+    const snippets = {
+      base: `${location.origin}/v1`,
+      curl,
+      env: `OPENAI_BASE_URL=${location.origin}/v1\nOPENAI_API_KEY=${needsKey ? "<gateway-key>" : "unused"}`,
+      anthropic: `ANTHROPIC_BASE_URL=${location.origin}\nANTHROPIC_AUTH_TOKEN=${needsKey ? "<gateway-key>" : "unused"}`,
+      admin: `curl ${location.origin}/api/overview -H "x-admin-token: <ADMIN_TOKEN>"`,
+    };
+    view.addEventListener("click", async (e) => {
+      const copyBtn = e.target.closest("[data-copy]");
+      if (copyBtn) { copy(snippets[copyBtn.getAttribute("data-copy")] || ""); return; }
+      if (e.target.id === "ttl-refresh") { try { await api("/api/models?refresh=1"); toast("Catalog refreshed", "ok"); renderPage(); } catch (err) { toast(err.message, "bad"); } }
+      if (e.target.id === "logout") {
+        localStorage.removeItem(TOKEN_KEY); adminToken = "";
+        location.hash = "#overview"; location.reload();
+      }
+      if (e.target.id === "export-all") {
+        try {
+          const res = await fetch("/api/export.csv", { headers: adminToken ? { "x-admin-token": adminToken } : {} });
+          if (!res.ok) throw new Error("Export failed");
+          const blob = await res.blob();
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob); a.download = "kilo-gateway-requests.csv";
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+          toast("Export downloaded", "ok");
+        } catch (err) { toast(err.message, "bad"); }
+      }
+      if (e.target.id === "clear-all") {
+        if (!confirm("Delete all request logs?")) return;
+        try { const r = await api("/api/requests", { method: "DELETE" }); toast(`Deleted ${exact(r.deleted)} rows`, "ok"); }
+        catch (err) { toast(err.message, "bad"); }
+      }
+    });
+  }
+
+  // ---------- boot ----------
+  async function boot() {
+    let status = { admin_required: false, key_required: false, version: "" };
+    try {
+      const res = await fetch("/api/auth-status");
+      if (res.ok) status = await res.json();
+    } catch { /* offline; the login path still works */ }
+    state.authStatus = status;
+
+    const url = new URL(location.href);
+    const urlToken = url.searchParams.get("token");
+    if (urlToken) {
+      adminToken = urlToken;
+      localStorage.setItem(TOKEN_KEY, urlToken);
+      url.searchParams.delete("token");
+      history.replaceState(null, "", url.pathname + (url.search || "") + url.hash);
+    }
+
+    if (status.admin_required) {
+      if (!adminToken) { showLogin(); return; }
+      const check = await fetch("/api/health", { headers: { "x-admin-token": adminToken } }).catch(() => null);
+      if (!check || !check.ok) {
+        localStorage.removeItem(TOKEN_KEY);
+        adminToken = "";
+        showLogin(check && check.status === 401 ? "Admin token rejected." : "Gateway unreachable.");
+        return;
+      }
+    }
+    hideLogin();
+    $("#app").hidden = false;
+    route();
+    loadStatus();
+  }
+
+  window.addEventListener("hashchange", route);
+  boot();
+})();
+</script>
+</body>
+</html>

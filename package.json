@@ -1,0 +1,22 @@
+{
+  "name": "kilo-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Kilo Gateway free models as an OpenAI/Anthropic-compatible endpoint, with managed keys, quotas, request analytics and a dashboard.",
+  "scripts": {
+    "start": "bun src/main.ts",
+    "dev": "bun --watch src/main.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "build": "bun build --compile src/main.ts --outfile dist/kilo-gateway"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "typescript": "^5.6.0"
+  },
+  "license": "MIT"
+}
