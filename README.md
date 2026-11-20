@@ -248,7 +248,7 @@ thrown request handler returns a JSON 500 without stopping the process.
 
 ```sh
 bun test          # unit + HTTP integration against a fake upstream
-bunx tsc --noEmit # typecheck
+bun run typecheck # tsc, works on Termux too
 bun run dev       # watch mode
 ```
 

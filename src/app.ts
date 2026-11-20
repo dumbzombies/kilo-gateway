@@ -12,6 +12,10 @@ import { PROXY_PATHS, handleProxy } from "./proxy.ts";
 import { authenticate, isAdmin } from "./security.ts";
 import uiHtml from "./ui.html" with { type: "text" };
 
+// Bun types `*.html` as HTMLBundle for the default HTML-import convention;
+// the explicit `type: "text"` attribute makes the runtime value a string.
+const uiSource = uiHtml as unknown as string;
+
 export interface AppDeps {
   cfg: Config;
   store: Store;
@@ -62,7 +66,7 @@ export function createApp(deps: AppDeps): { fetch: (req: Request) => Promise<Res
   const startedAt = deps.startedAt ?? Date.now();
   const cors = corsHeaders(cfg);
   const fetchImpl = deps.fetchImpl ?? fetch;
-  const ui = deps.ui ?? uiHtml;
+  const ui = deps.ui ?? uiSource;
   const proxyDeps = { cfg, store, fetchImpl, cors };
   const apiDeps = { cfg, store, catalog, startedAt };
 

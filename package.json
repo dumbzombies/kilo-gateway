@@ -8,7 +8,7 @@
     "start": "bun src/main.ts",
     "dev": "bun --watch src/main.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun node_modules/typescript/bin/tsc --noEmit",
     "build": "bun build --compile src/main.ts --outfile dist/kilo-gateway"
   },
   "engines": {

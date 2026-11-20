@@ -23,8 +23,8 @@ function sse(lines: string[]): Response {
   });
 }
 
-let upstream: Server;
-let gateway: Server;
+let upstream: Server<undefined>;
+let gateway: Server<undefined>;
 let base = "";
 let store: Store;
 
@@ -108,10 +108,10 @@ describe("health and catalog", () => {
   test("liveness and readiness do not require auth", async () => {
     const health = await fetch(`${base}/healthz`);
     expect(health.status).toBe(200);
-    expect((await readJson(health)).ok).toBe(true);
+    expect((await readJson<{ ok: boolean }>(health)).ok).toBe(true);
     const ready = await fetch(`${base}/readyz`);
     expect(ready.status).toBe(200);
-    expect((await readJson(ready)).catalog.count).toBe(1);
+    expect((await readJson<{ catalog: { count: number } }>(ready)).catalog.count).toBe(1);
   });
 
   test("serves only free models to /v1/models", async () => {
