@@ -99,9 +99,9 @@ fi
 DATA_DIR="$HOME/.local/share/kilo-gateway-data"
 mkdir -p "$DATA_DIR"
 
-cat <<EOF
+printf '\n\033[1;32mkilo-gateway is installed.\033[0m\n\n'
 
-\033[1;32mkilo-gateway is installed.\033[0m
+cat <<EOF
 
 Start it:
   DATA_DIR="$DATA_DIR" kilo-gateway
