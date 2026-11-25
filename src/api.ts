@@ -4,9 +4,12 @@
 
 import type { Config } from "./config.ts";
 import { VERSION } from "./config.ts";
-import type { ApiKeyRow, RequestFilters, Store } from "./db.ts";
+import type { ApiKeyRow, RequestFilters, Store, UserRow } from "./db.ts";
 import type { Catalog } from "./catalog.ts";
+import type { Egress } from "./egress.ts";
+import type { UpstreamPool } from "./keypool.ts";
 import { generateKey, newKeyId } from "./security.ts";
+import { createAccount, publicUser } from "./accounts.ts";
 import { isRecord } from "./json.ts";
 
 export interface ApiDeps {
@@ -14,6 +17,9 @@ export interface ApiDeps {
   store: Store;
   catalog: Catalog;
   startedAt: number;
+  egress?: Egress;
+  /** Upstream credential pool, editable from the dashboard. */
+  pool?: UpstreamPool;
 }
 
 const LIMITS = { maxName: 60, maxRpm: 1_000_000, maxDaily: 1_000_000, maxUpstreamKey: 500 } as const;
@@ -23,6 +29,11 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
     status,
     headers: { "content-type": "application/json; charset=utf-8", ...headers },
   });
+}
+
+/** `null`/absent follows AUTH_EGRESS; explicit values pin the path. */
+function asEgress(value: unknown): "direct" | "warp" | null {
+  return value === "direct" || value === "warp" ? value : null;
 }
 
 function publicKey(row: ApiKeyRow, usage?: { requests: number; total_tokens: number; today_requests: number; today_tokens: number }) {
@@ -37,6 +48,7 @@ function publicKey(row: ApiKeyRow, usage?: { requests: number; total_tokens: num
     rpm: row.rpm,
     daily_limit: row.daily_limit,
     has_upstream_key: Boolean(row.upstream_key),
+    egress: row.egress,
     usage: usage ?? { requests: 0, total_tokens: 0, today_requests: 0, today_tokens: 0 },
   };
 }
@@ -115,6 +127,8 @@ function exportCsv(store: Store, filters: RequestFilters): string {
     "total_tokens",
     "cost_usd",
     "source",
+    "egress",
+    "egress_retries",
     "error",
   ];
   const lines = [header.join(",")];
@@ -138,6 +152,8 @@ function exportCsv(store: Store, filters: RequestFilters): string {
         r.total_tokens,
         r.cost_usd ?? "",
         r.source,
+        r.egress ?? "",
+        r.egress_retries,
         r.error ?? "",
       ]
         .map(csvCell)
@@ -234,6 +250,7 @@ export async function handleApi(req: Request, url: URL, deps: ApiDeps): Promise<
       rpm,
       daily_limit: dailyLimit,
       upstream_key: upstreamKey,
+      egress: asEgress(body.egress),
     });
     return json({ key: publicKey(row), secret: generated.secret }, 201);
   }
@@ -244,7 +261,10 @@ export async function handleApi(req: Request, url: URL, deps: ApiDeps): Promise<
     if (req.method === "PATCH") {
       const body = await readJson(req);
       if (!body) return json({ error: "Invalid JSON body." }, 400);
-      const patch: Partial<Pick<ApiKeyRow, "name" | "rpm" | "daily_limit" | "upstream_key" | "revoked_at">> = {};
+      const patch: Partial<
+        Pick<ApiKeyRow, "name" | "rpm" | "daily_limit" | "upstream_key" | "revoked_at" | "egress">
+      > = {};
+      if (body.egress !== undefined) patch.egress = asEgress(body.egress);
       if (typeof body.name === "string") patch.name = body.name.trim().slice(0, LIMITS.maxName) || "API key";
       if (body.rpm !== undefined) patch.rpm = asInt(body.rpm, 0, 0, LIMITS.maxRpm);
       if (body.daily_limit !== undefined) patch.daily_limit = asInt(body.daily_limit, 0, 0, LIMITS.maxDaily);
@@ -318,6 +338,8 @@ export async function handleApi(req: Request, url: URL, deps: ApiDeps): Promise<
       require_key: cfg.requireKey,
       admin_required: cfg.adminToken !== "",
       retention_days: cfg.retentionDays,
+      egress: deps.egress?.status() ?? { enabled: false, proxies: [], max_attempts: 1 },
+      egress_policy: { anonymous: cfg.anonEgress, authenticated: cfg.authEgress },
       catalog_ttl_ms: cfg.catalogTtlMs,
       upstream_timeout_ms: cfg.upstreamTimeoutMs,
       max_body_bytes: cfg.maxBodyBytes,
@@ -340,6 +362,95 @@ export async function handleApi(req: Request, url: URL, deps: ApiDeps): Promise<
       database_bytes: store.sizeBytes(),
       admin_required: cfg.adminToken !== "",
       require_key: cfg.requireKey,
+      accounts: store.countUsers(),
+      egress: deps.egress?.status() ?? { enabled: false, proxies: [], max_attempts: 1 },
+    });
+  }
+
+  if (path === "/api/users" && req.method === "GET") {
+    return json({
+      users: store.listUsers().map((u) => ({
+        ...publicUser(u),
+        sessions: 0,
+      })),
+    });
+  }
+
+  if (path === "/api/users" && req.method === "POST") {
+    const body = await readJson(req);
+    if (!body) return json({ error: "Invalid JSON body." }, 400);
+    const outcome = createAccount(store, body);
+    if (!outcome.ok) return json({ error: outcome.message }, outcome.status);
+    return json({ user: publicUser(outcome.user) }, 201);
+  }
+
+  const userMatch = /^\/api\/users\/([A-Za-z0-9-]+)$/.exec(path);
+  if (userMatch) {
+    const id = userMatch[1];
+    if (req.method === "PATCH") {
+      const body = await readJson(req);
+      if (!body) return json({ error: "Invalid JSON body." }, 400);
+      const patch: Partial<Pick<UserRow, "name" | "role" | "disabled_at">> = {};
+      if (typeof body.name === "string" && body.name.trim()) patch.name = body.name.trim().slice(0, 80);
+      if (body.role === "owner" || body.role === "member") patch.role = body.role;
+      if (body.disabled !== undefined) patch.disabled_at = body.disabled ? Date.now() : null;
+      const row = store.updateUser(id, patch);
+      if (!row) return json({ error: "Account not found." }, 404);
+      return json({ user: publicUser(row) });
+    }
+    if (req.method === "DELETE") {
+      if (!store.deleteUser(id)) return json({ error: "Account not found." }, 404);
+      return json({ ok: true });
+    }
+  }
+
+  // Upstream credential pool: same shape the template's /api/state exposes.
+  if (path === "/api/upstream-keys" && req.method === "GET") {
+    return json({
+      keys: deps.pool?.state() ?? [],
+      available: deps.pool?.available().length ?? 0,
+      total: deps.pool?.size ?? 0,
+    });
+  }
+
+  if (path === "/api/upstream-keys" && req.method === "POST") {
+    const body = await readJson(req);
+    if (!body) return json({ error: "Invalid JSON body." }, 400);
+    const action = body.action;
+    const key = typeof body.key === "string" ? body.key.trim() : "";
+    if (!deps.pool) return json({ error: "This runtime has no credential pool." }, 501);
+    if (action === "add") {
+      if (!key) return json({ error: "Empty key." }, 400);
+      const added = deps.pool.add(key);
+      return json({ added, keys: deps.pool.state() }, added ? 201 : 200);
+    }
+    if (action === "remove") {
+      if (!key) return json({ error: "Empty key." }, 400);
+      const outcome = deps.pool.remove(key);
+      if (outcome === "ambiguous") {
+        // The masked label matched more than one credential; deleting all of
+        // them would be data loss, so the caller must identify the exact key.
+        return json(
+          {
+            error:
+              "That shortened key matches more than one credential. Send the full key to remove exactly one.",
+            keys: deps.pool.state(),
+          },
+          409,
+        );
+      }
+      return json({ removed: outcome === "removed", keys: deps.pool.state() }, outcome === "removed" ? 200 : 404);
+    }
+    return json({ error: 'Expected {"action":"add"|"remove","key":"…"}.' }, 400);
+  }
+
+  if (path === "/api/egress" && req.method === "GET") {
+    const status = deps.egress?.status() ?? { enabled: false, proxies: [], max_attempts: 1 };
+    return json({
+      ...status,
+      policy: { anonymous: cfg.anonEgress, authenticated: cfg.authEgress },
+      // Per-exit totals for the current retention window.
+      usage: store.egressUsage(sinceFrom(url)),
     });
   }
 

@@ -88,11 +88,17 @@ export class Catalog {
   private lastError: string | null = null;
   private inflight: Promise<CatalogModel[]> | null = null;
 
-  constructor(
-    private readonly upstream: string,
-    private readonly ttlMs: number,
-    private readonly fetchImpl: typeof fetch = fetch,
-  ) {}
+  // Plain fields, assigned in the constructor: Node's type stripping rejects
+  // TypeScript parameter properties, and this file must run under both runtimes.
+  private readonly upstream: string;
+  private readonly ttlMs: number;
+  private readonly fetchImpl: typeof fetch;
+
+  constructor(upstream: string, ttlMs: number, fetchImpl: typeof fetch = fetch) {
+    this.upstream = upstream;
+    this.ttlMs = ttlMs;
+    this.fetchImpl = fetchImpl;
+  }
 
   get url(): string {
     return `${this.upstream}/models`;

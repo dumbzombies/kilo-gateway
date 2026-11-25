@@ -1,10 +1,9 @@
-// SQLite persistence: virtual API keys and one row per proxied request.
-// bun:sqlite keeps the deployment single-file and single-process — the same
-// shape as the rest of the gateway.
+// SQLite persistence: virtual API keys, accounts, and one row per proxied
+// request. Uses the runtime-neutral adapter in `sqlite.ts`, so the same store
+// runs under Bun and Node.
 
-import { Database } from "bun:sqlite";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { Database } from "./sqlite.ts";
+import { startOfUtcDay } from "./shared.ts";
 
 export interface ApiKeyRow {
   id: string;
@@ -17,6 +16,8 @@ export interface ApiKeyRow {
   rpm: number;
   daily_limit: number;
   upstream_key: string | null;
+  /** `null` follows AUTH_EGRESS; otherwise pins 'direct' or 'warp'. */
+  egress: "direct" | "warp" | null;
 }
 
 export interface RequestRecord {
@@ -39,6 +40,9 @@ export interface RequestRecord {
   client: string | null;
   error: string | null;
   source: string;
+  /** Exit that served the call; null when logging predates egress tracking. */
+  egress?: string | null;
+  egress_retries?: number;
 }
 
 export interface RequestFilters {
@@ -71,6 +75,8 @@ export interface RequestRow {
   client: string | null;
   error: string | null;
   source: string;
+  egress: string | null;
+  egress_retries: number;
 }
 
 export interface Summary {
@@ -101,6 +107,42 @@ export interface ModelBucket {
   avg_ms: number;
 }
 
+export interface UserRow {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  created_at: number;
+  last_login_at: number | null;
+  disabled_at: number | null;
+}
+
+export type DeviceStatus = "pending" | "approved" | "denied" | "consumed" | "expired";
+
+export interface DeviceCodeRow {
+  device_code: string;
+  user_code: string;
+  client_id: string;
+  user_id: string | null;
+  created_at: number;
+  expires_at: number;
+  interval: number;
+  status: DeviceStatus;
+  last_polled_at: number | null;
+  client_fingerprint: string | null;
+}
+
+export interface TokenRow {
+  id: string;
+  user_id: string;
+  client_id: string;
+  created_at: number;
+  expires_at: number;
+  last_used_at: number | null;
+  user_agent: string | null;
+  client_fingerprint: string | null;
+}
+
 export interface KeyUsage {
   requests: number;
   total_tokens: number;
@@ -119,7 +161,9 @@ CREATE TABLE IF NOT EXISTS api_keys (
   revoked_at    INTEGER,
   rpm           INTEGER NOT NULL DEFAULT 0,
   daily_limit   INTEGER NOT NULL DEFAULT 0,
-  upstream_key  TEXT
+  upstream_key  TEXT,
+  -- Per-key egress: NULL = follow AUTH_EGRESS, otherwise 'direct' or 'warp'.
+  egress        TEXT
 );
 CREATE TABLE IF NOT EXISTS requests (
   id                TEXT PRIMARY KEY,
@@ -140,25 +184,112 @@ CREATE TABLE IF NOT EXISTS requests (
   cost_usd          REAL,
   client            TEXT,
   error             TEXT,
-  source            TEXT NOT NULL DEFAULT 'api'
+  source            TEXT NOT NULL DEFAULT 'api',
+  egress            TEXT,
+  egress_retries    INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS requests_ts ON requests(ts);
 CREATE INDEX IF NOT EXISTS requests_model ON requests(model);
 CREATE INDEX IF NOT EXISTS requests_key ON requests(key_id, ts);
 CREATE INDEX IF NOT EXISTS requests_status ON requests(status, ts);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS users (
+  id            TEXT PRIMARY KEY,
+  email         TEXT NOT NULL UNIQUE,
+  name          TEXT NOT NULL,
+  role          TEXT NOT NULL DEFAULT 'member',
+  created_at    INTEGER NOT NULL,
+  last_login_at INTEGER,
+  disabled_at   INTEGER
+);
+-- RFC 8628 device authorization attempts (warm-run-cli pattern).
+CREATE TABLE IF NOT EXISTS device_codes (
+  device_code        TEXT PRIMARY KEY,
+  user_code          TEXT NOT NULL UNIQUE,
+  client_id          TEXT NOT NULL,
+  user_id            TEXT,
+  created_at         INTEGER NOT NULL,
+  expires_at         INTEGER NOT NULL,
+  interval           INTEGER NOT NULL,
+  status             TEXT NOT NULL DEFAULT 'pending',
+  last_polled_at     INTEGER,
+  client_fingerprint TEXT
+);
+CREATE INDEX IF NOT EXISTS device_codes_expires ON device_codes(expires_at);
+-- Bearer access tokens; only the SHA-256 is stored.
+CREATE TABLE IF NOT EXISTS tokens (
+  id                 TEXT PRIMARY KEY,
+  user_id            TEXT NOT NULL,
+  client_id          TEXT NOT NULL,
+  created_at         INTEGER NOT NULL,
+  expires_at         INTEGER NOT NULL,
+  last_used_at       INTEGER,
+  user_agent         TEXT,
+  client_fingerprint TEXT
+);
+CREATE INDEX IF NOT EXISTS tokens_user ON tokens(user_id);
+CREATE INDEX IF NOT EXISTS tokens_expires ON tokens(expires_at);
 `;
 
 export class Store {
   readonly db: Database;
+  /**
+   * In-flight quota reservations, keyed by api key id.
+   *
+   * The quota check used to be check-then-act across an await: eight concurrent
+   * requests all counted zero rows and all passed. Reservations close that hole —
+   * the check and the reservation happen in one synchronous step, and the
+   * reservation is released when the request record lands (or is abandoned).
+   */
+  private readonly reserved = new Map<string, Set<string>>();
+  private reservationSeq = 0;
 
   constructor(path: string) {
-    if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-    this.db = new Database(path, { create: true });
-    this.db.exec("PRAGMA journal_mode = WAL;");
+    this.db = new Database(path);
     this.db.exec("PRAGMA synchronous = NORMAL;");
     this.db.exec("PRAGMA busy_timeout = 5000;");
     this.db.exec(SCHEMA);
+    // Databases created before egress tracking lack these columns; SQLite has
+    // no ADD COLUMN IF NOT EXISTS, so probe and add.
+    const columns = new Set(
+      (this.db.query("PRAGMA table_info(requests)").all() as { name: string }[]).map((c) => c.name),
+    );
+    if (!columns.has("egress")) this.db.exec("ALTER TABLE requests ADD COLUMN egress TEXT");
+    const keyColumns = new Set(
+      (this.db.query("PRAGMA table_info(api_keys)").all() as { name: string }[]).map((c) => c.name),
+    );
+    if (keyColumns.size > 0 && !keyColumns.has("egress")) {
+      this.db.exec("ALTER TABLE api_keys ADD COLUMN egress TEXT");
+    }
+    if (!columns.has("egress_retries")) {
+      this.db.exec("ALTER TABLE requests ADD COLUMN egress_retries INTEGER NOT NULL DEFAULT 0");
+    }
+    // An earlier build stored argon2 password hashes and cookie sessions.
+    // Authentication is device-code only now, so rebuild `users` without the
+    // dead column and drop `sessions` (replaced by bearer `tokens`). Existing
+    // accounts are preserved; they simply re-authorize through the device flow.
+    const userColumns = new Set(
+      (this.db.query("PRAGMA table_info(users)").all() as { name: string }[]).map((c) => c.name),
+    );
+    if (userColumns.has("password_hash")) {
+      this.db.transaction(() => {
+        this.db.exec(`CREATE TABLE users_new (
+          id            TEXT PRIMARY KEY,
+          email         TEXT NOT NULL UNIQUE,
+          name          TEXT NOT NULL,
+          role          TEXT NOT NULL DEFAULT 'member',
+          created_at    INTEGER NOT NULL,
+          last_login_at INTEGER,
+          disabled_at   INTEGER
+        )`);
+        this.db.exec(`INSERT INTO users_new (id, email, name, role, created_at, last_login_at, disabled_at)
+                      SELECT id, email, name, role, created_at, last_login_at, disabled_at FROM users`);
+        this.db.exec("DROP TABLE users");
+        this.db.exec("ALTER TABLE users_new RENAME TO users");
+        this.db.exec("DROP TABLE IF EXISTS sessions");
+      })();
+      console.log("[kilo-gateway] migrated users to device-code auth (password_hash dropped, sessions table removed)");
+    }
   }
 
   close(): void {
@@ -171,15 +302,41 @@ export class Store {
 
   // ---- keys -------------------------------------------------------------
 
-  createKey(row: Omit<ApiKeyRow, "created_at" | "last_used_at" | "revoked_at">): ApiKeyRow {
-    const full: ApiKeyRow = { ...row, created_at: Date.now(), last_used_at: null, revoked_at: null };
+  createKey(
+    row: Omit<ApiKeyRow, "created_at" | "last_used_at" | "revoked_at" | "egress"> & {
+      egress?: "direct" | "warp" | null;
+    },
+  ): ApiKeyRow {
+    const full: ApiKeyRow = {
+      ...row,
+      egress: row.egress ?? null,
+      created_at: Date.now(),
+      last_used_at: null,
+      revoked_at: null,
+    };
     this.db
       .query(
-        `INSERT INTO api_keys (id, name, prefix, hash, created_at, last_used_at, revoked_at, rpm, daily_limit, upstream_key)
-         VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)`,
+        `INSERT INTO api_keys (id, name, prefix, hash, created_at, last_used_at, revoked_at, rpm, daily_limit,
+                              upstream_key, egress)
+         VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)`,
       )
-      .run(full.id, full.name, full.prefix, full.hash, full.created_at, full.rpm, full.daily_limit, full.upstream_key);
+      .run(
+        full.id,
+        full.name,
+        full.prefix,
+        full.hash,
+        full.created_at,
+        full.rpm,
+        full.daily_limit,
+        full.upstream_key,
+        full.egress,
+      );
     return full;
+  }
+
+  /** Non-revoked keys, for the "is this install configured?" banner. */
+  countKeys(): number {
+    return (this.db.query("SELECT COUNT(*) AS n FROM api_keys WHERE revoked_at IS NULL").get() as { n: number }).n;
   }
 
   keyByHash(hash: string): ApiKeyRow | null {
@@ -200,16 +357,17 @@ export class Store {
 
   updateKey(
     id: string,
-    patch: Partial<Pick<ApiKeyRow, "name" | "rpm" | "daily_limit" | "upstream_key" | "revoked_at">>,
+    patch: Partial<Pick<ApiKeyRow, "name" | "rpm" | "daily_limit" | "upstream_key" | "revoked_at" | "egress">>,
   ): ApiKeyRow | null {
     const current = this.keyById(id);
     if (!current) return null;
     const next = { ...current, ...patch };
     this.db
       .query(
-        "UPDATE api_keys SET name = ?, rpm = ?, daily_limit = ?, upstream_key = ?, revoked_at = ? WHERE id = ?",
+        `UPDATE api_keys SET name = ?, rpm = ?, daily_limit = ?, upstream_key = ?, revoked_at = ?, egress = ?
+         WHERE id = ?`,
       )
-      .run(next.name, next.rpm, next.daily_limit, next.upstream_key, next.revoked_at, id);
+      .run(next.name, next.rpm, next.daily_limit, next.upstream_key, next.revoked_at, next.egress, id);
     return next;
   }
 
@@ -223,6 +381,53 @@ export class Store {
       .query("SELECT COUNT(*) AS n FROM requests WHERE key_id = ? AND ts >= ?")
       .get(keyId, since) as { n: number };
     return row.n;
+  }
+
+  /**
+   * Atomically checks both quotas and, when both allow, reserves a slot.
+   *
+   * Synchronous on purpose: JavaScript runs this to completion, so no other
+   * request can interleave between the count and the reservation.
+   *
+   * @returns `null` when the request may proceed on the key's own tier, else
+   *          which quota was exhausted.
+   */
+  reserveQuota(
+    key: { id: string; rpm: number; daily_limit: number },
+    now = Date.now(),
+  ): { exceeded: "rpm" | "daily"; ticket: null } | { exceeded: null; ticket: string } {
+    const held = this.reserved.get(key.id)?.size ?? 0;
+    if (key.rpm > 0) {
+      const used = this.keyRequestsSince(key.id, now - 60_000) + held;
+      if (used >= key.rpm) return { exceeded: "rpm", ticket: null };
+    }
+    if (key.daily_limit > 0) {
+      const used = this.keyRequestsSince(key.id, startOfUtcDay(now)) + held;
+      if (used >= key.daily_limit) return { exceeded: "daily", ticket: null };
+    }
+    const ticket = `r${++this.reservationSeq}`;
+    const set = this.reserved.get(key.id) ?? new Set<string>();
+    set.add(ticket);
+    this.reserved.set(key.id, set);
+    return { exceeded: null, ticket };
+  }
+
+  /**
+   * Releases one reservation. Idempotent: releasing a ticket twice (or a ticket
+   * that was never held) is a no-op, so a completion path and an error path can
+   * both release without corrupting the count.
+   */
+  releaseQuota(keyId: string, ticket?: string): void {
+    const set = this.reserved.get(keyId);
+    if (!set) return;
+    if (ticket === undefined) {
+      // Untargeted release: drop the oldest outstanding reservation.
+      const oldest = set.values().next();
+      if (!oldest.done) set.delete(oldest.value);
+    } else {
+      set.delete(ticket);
+    }
+    if (set.size === 0) this.reserved.delete(keyId);
   }
 
   keyUsage(): Map<string, KeyUsage> {
@@ -252,6 +457,145 @@ export class Store {
     return usage;
   }
 
+  // ---- users, device codes and tokens ------------------------------------
+
+  createUser(row: Pick<UserRow, "id" | "email" | "name" | "role">): UserRow {
+    const full: UserRow = { ...row, created_at: Date.now(), last_login_at: null, disabled_at: null };
+    this.db
+      .query("INSERT INTO users (id, email, name, role, created_at, last_login_at, disabled_at) VALUES (?, ?, ?, ?, ?, NULL, NULL)")
+      .run(full.id, full.email, full.name, full.role, full.created_at);
+    return full;
+  }
+
+  userByEmail(email: string): UserRow | null {
+    return (this.db.query("SELECT * FROM users WHERE email = ?").get(email) as UserRow | null) ?? null;
+  }
+
+  userById(id: string): UserRow | null {
+    return (this.db.query("SELECT * FROM users WHERE id = ?").get(id) as UserRow | null) ?? null;
+  }
+
+  listUsers(): UserRow[] {
+    return this.db.query("SELECT * FROM users ORDER BY created_at ASC").all() as UserRow[];
+  }
+
+  countUsers(): number {
+    return (this.db.query("SELECT COUNT(*) AS n FROM users").get() as { n: number }).n;
+  }
+
+  updateUser(
+    id: string,
+    patch: Partial<Pick<UserRow, "name" | "role" | "last_login_at" | "disabled_at">>,
+  ): UserRow | null {
+    const current = this.userById(id);
+    if (!current) return null;
+    const next = { ...current, ...patch };
+    this.db
+      .query("UPDATE users SET name = ?, role = ?, last_login_at = ?, disabled_at = ? WHERE id = ?")
+      .run(next.name, next.role, next.last_login_at, next.disabled_at, id);
+    return next;
+  }
+
+  deleteUser(id: string): boolean {
+    this.db.query("DELETE FROM tokens WHERE user_id = ?").run(id);
+    this.db.query("UPDATE device_codes SET status = 'denied' WHERE user_id = ?").run(id);
+    return this.db.query("DELETE FROM users WHERE id = ?").run(id).changes > 0;
+  }
+
+  createDeviceCode(row: DeviceCodeRow): void {
+    this.db
+      .query(
+        `INSERT INTO device_codes (device_code, user_code, client_id, user_id, created_at, expires_at,
+                                   interval, status, last_polled_at, client_fingerprint)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        row.device_code,
+        row.user_code,
+        row.client_id,
+        row.user_id,
+        row.created_at,
+        row.expires_at,
+        row.interval,
+        row.status,
+        row.last_polled_at,
+        row.client_fingerprint,
+      );
+  }
+
+  deviceCodeByHash(hash: string): DeviceCodeRow | null {
+    return (this.db.query("SELECT * FROM device_codes WHERE device_code = ?").get(hash) as DeviceCodeRow | null) ?? null;
+  }
+
+  /** The human-facing lookup: the code typed into the verification page. */
+  deviceCodeByUserCode(code: string): DeviceCodeRow | null {
+    return (this.db.query("SELECT * FROM device_codes WHERE user_code = ?").get(code.toUpperCase()) as DeviceCodeRow | null) ?? null;
+  }
+
+  approveDeviceCode(code: string, userId: string): boolean {
+    const row = this.deviceCodeByUserCode(code);
+    if (!row || row.status !== "pending" || row.expires_at <= Date.now()) return false;
+    this.db.query("UPDATE device_codes SET status = 'approved', user_id = ? WHERE device_code = ?").run(userId, row.device_code);
+    return true;
+  }
+
+  denyDeviceCode(code: string): boolean {
+    const row = this.deviceCodeByUserCode(code);
+    if (!row || row.status !== "pending") return false;
+    this.db.query("UPDATE device_codes SET status = 'denied' WHERE device_code = ?").run(row.device_code);
+    return true;
+  }
+
+  setDeviceStatus(hash: string, status: DeviceStatus): void {
+    this.db.query("UPDATE device_codes SET status = ? WHERE device_code = ?").run(status, hash);
+  }
+
+  touchDeviceCode(hash: string, now: number, interval: number): void {
+    this.db.query("UPDATE device_codes SET last_polled_at = ?, interval = ? WHERE device_code = ?").run(now, interval, hash);
+  }
+
+  purgeDeviceCodes(now = Date.now()): number {
+    return this.db.query("DELETE FROM device_codes WHERE expires_at <= ?").run(now).changes;
+  }
+
+  createToken(row: TokenRow): void {
+    this.db
+      .query(
+        `INSERT INTO tokens (id, user_id, client_id, created_at, expires_at, last_used_at, user_agent, client_fingerprint)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        row.id,
+        row.user_id,
+        row.client_id,
+        row.created_at,
+        row.expires_at,
+        row.last_used_at,
+        row.user_agent,
+        row.client_fingerprint,
+      );
+  }
+
+  tokenById(id: string): TokenRow | null {
+    return (this.db.query("SELECT * FROM tokens WHERE id = ?").get(id) as TokenRow | null) ?? null;
+  }
+
+  countTokens(): number {
+    return (this.db.query("SELECT COUNT(*) AS n FROM tokens").get() as { n: number }).n;
+  }
+
+  touchToken(id: string, now: number): void {
+    this.db.query("UPDATE tokens SET last_used_at = ? WHERE id = ?").run(now, id);
+  }
+
+  deleteToken(id: string): void {
+    this.db.query("DELETE FROM tokens WHERE id = ?").run(id);
+  }
+
+  purgeTokens(now = Date.now()): number {
+    return this.db.query("DELETE FROM tokens WHERE expires_at <= ?").run(now).changes;
+  }
+
   // ---- requests ---------------------------------------------------------
 
   insertRequest(rec: RequestRecord): void {
@@ -259,8 +603,9 @@ export class Store {
       .query(
         `INSERT INTO requests
          (id, ts, key_id, key_name, method, path, model, status, upstream_status, stream,
-          duration_ms, ttft_ms, prompt_tokens, completion_tokens, total_tokens, cost_usd, client, error, source)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          duration_ms, ttft_ms, prompt_tokens, completion_tokens, total_tokens, cost_usd, client, error, source,
+          egress, egress_retries)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         rec.id,
@@ -282,6 +627,8 @@ export class Store {
         rec.client,
         rec.error,
         rec.source,
+        rec.egress ?? null,
+        rec.egress_retries ?? 0,
       );
   }
 
@@ -427,6 +774,19 @@ export class Store {
     return rows.map((r) => r.model);
   }
 
+  /** Calls served per egress exit, for the egress panel. */
+  egressUsage(since: number): { egress: string; requests: number; retries: number; errors: number }[] {
+    return this.db
+      .query(
+        `SELECT COALESCE(egress, 'untracked') AS egress,
+                COUNT(*) AS requests,
+                COALESCE(SUM(egress_retries), 0) AS retries,
+                COALESCE(SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END), 0) AS errors
+         FROM requests WHERE ts >= ? GROUP BY egress ORDER BY requests DESC`,
+      )
+      .all(since) as { egress: string; requests: number; retries: number; errors: number }[];
+  }
+
   purge(before: number): number {
     return this.db.query("DELETE FROM requests WHERE ts < ?").run(before).changes;
   }
@@ -440,8 +800,4 @@ export class Store {
       return 0;
     }
   }
-}
-
-export function startOfUtcDay(now = Date.now()): number {
-  return Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), new Date(now).getUTCDate());
 }

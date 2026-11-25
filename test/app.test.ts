@@ -277,7 +277,7 @@ describe("dashboard API", () => {
     expect(denied.status).toBe(401);
   });
 
-  test("enforces per-key request limits", async () => {
+  test("a key past its quota falls back to the anonymous tier", async () => {
     const created = await readJson<{ secret: string; key: { id: string } }>(
       await fetch(`${base}/api/keys`, {
         method: "POST",
@@ -291,9 +291,15 @@ describe("dashboard API", () => {
         headers: { "content-type": "application/json", authorization: `Bearer ${created.secret}` },
         body: JSON.stringify({ model: FREE_MODEL, messages: [{ role: "user", content: "hi" }] }),
       });
-    expect((await call()).status).toBe(200);
+    const first = await call();
+    expect(first.status).toBe(200);
+    expect(first.headers.get("x-gateway-tier")).toBe("key");
+
+    // Over quota: still served (anonymous tier), never a 429 downstream.
     const second = await call();
-    expect(second.status).toBe(429);
+    expect(second.status).toBe(200);
+    expect(second.headers.get("x-gateway-tier")).toBe("anonymous");
+    expect(second.headers.get("x-gateway-degraded")).toBe("rpm");
     expect(second.headers.get("retry-after")).toBe("60");
   });
 

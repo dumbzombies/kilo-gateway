@@ -18,17 +18,17 @@
     --text: #ececf2;
     --muted: #9b9baa;
     --faint: #6c6c7d;
-    --accent: #8b7cf6;
-    --accent-2: #a99cff;
-    --accent-soft: rgba(139, 124, 246, .13);
-    --accent-border: rgba(139, 124, 246, .38);
+    --accent: #ffdc03;
+    --accent-2: #ffe74d;
+    --accent-soft: rgba(255, 220, 3, .12);
+    --accent-border: rgba(255, 220, 3, .38);
     --ok: #34d399;
     --warn: #fbbf24;
     --bad: #fb7185;
     --info: #60a5fa;
-    --c1: #8b7cf6;
+    --c1: #ffdc03;
     --c2: #34d399;
-    --c3: #fbbf24;
+    --c3: #fb923c;
     --c4: #60a5fa;
     --c5: #f472b6;
     --c6: #22d3ee;
@@ -42,7 +42,7 @@
   body {
     min-height: 100vh;
     background:
-      radial-gradient(900px 420px at 78% -8%, rgba(139, 124, 246, .10), transparent 60%),
+      radial-gradient(900px 420px at 78% -8%, rgba(255, 220, 3, .09), transparent 60%),
       radial-gradient(700px 380px at 8% 110%, rgba(52, 211, 153, .05), transparent 70%),
       var(--bg);
     color: var(--text);
@@ -50,7 +50,7 @@
     -webkit-font-smoothing: antialiased;
   }
   [hidden] { display: none !important; }
-  ::selection { background: var(--accent); color: #0b0716; }
+  ::selection { background: var(--accent); color: #14130a; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-thumb { background: #262634; border-radius: 8px; border: 2px solid var(--bg); }
@@ -83,7 +83,7 @@
   button.primary, .btn.primary {
     background: var(--accent);
     border-color: var(--accent);
-    color: #0c0818;
+    color: #14130a;
   }
   button.primary:hover, .btn.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
   button.ghost { background: transparent; border-color: transparent; color: var(--muted); padding: 7px 9px; }
@@ -131,10 +131,10 @@
   .mark {
     width: 34px; height: 34px; flex: none; border-radius: 10px;
     display: grid; place-items: center;
-    font: 700 17px/1 var(--mono); color: #d9d2ff;
-    background: linear-gradient(145deg, #211d38, #14141c);
+    font: 700 17px/1 var(--mono); color: #ffdc03;
+    background: linear-gradient(145deg, #2a2712, #14141c);
     border: 1px solid var(--accent-border);
-    box-shadow: 0 0 24px rgba(139, 124, 246, .16) inset;
+    box-shadow: 0 0 24px rgba(255, 220, 3, .16) inset;
   }
   .brand h1 { font-size: 15px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; }
   .brand .sub { color: var(--faint); font-size: 11.5px; font-weight: 500; }
@@ -247,7 +247,7 @@
     background: #0b0b11; border: 1px solid var(--accent-border);
     border-radius: 10px; padding: 12px 14px; margin: 14px 0;
   }
-  .secret-box code { flex: 1; min-width: 0; word-break: break-all; color: #d9d2ff; font-size: 12.5px; }
+  .secret-box code { flex: 1; min-width: 0; word-break: break-all; color: #ffe74d; font-size: 12.5px; }
   .playgrid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 14px; align-items: start; }
   .output {
     background: #0a0a10; border: 1px solid var(--border); border-radius: 12px;
@@ -295,11 +295,19 @@
     position: fixed; inset: 0; z-index: 80;
     display: flex; align-items: center; justify-content: center; padding: 20px;
     background:
-      radial-gradient(700px 360px at 50% 0%, rgba(139, 124, 246, .13), transparent 70%),
+      radial-gradient(700px 360px at 50% 0%, rgba(255, 220, 3, .12), transparent 70%),
       var(--bg);
   }
   .login-card { width: min(390px, 100%); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 18px; padding: 26px; box-shadow: 0 30px 90px rgba(0,0,0,.5); }
   .login-card .brand { padding: 0; margin-bottom: 20px; }
+  .device-code {
+    font: 700 26px/1.2 var(--mono); letter-spacing: .14em; text-align: center;
+    color: var(--accent); background: var(--surface-2); border: 1px solid var(--accent-border);
+    border-radius: 10px; padding: 14px 10px; margin: 4px 0 10px;
+  }
+  .device-meta { text-align: center; color: var(--muted); font-size: 12.5px; margin-bottom: 12px; min-height: 16px; }
+  .device-cmd { font: 12px/1.5 var(--mono); color: var(--muted); background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; overflow-x: auto; }
   .login-card h2 { font-size: 19px; letter-spacing: -.02em; }
   .login-card p { color: var(--muted); font-size: 13px; margin-top: 5px; }
   .login-card form { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
@@ -392,12 +400,33 @@
       <div class="mark">K</div>
       <div><h1>Kilo Gateway</h1><div class="sub">Admin console</div></div>
     </div>
-    <h2>Unlock the dashboard</h2>
-    <p>Enter the value of <code>ADMIN_TOKEN</code>. It is stored in this browser only.</p>
-    <form id="login-form">
-      <input id="login-token" type="password" autocomplete="current-password" placeholder="Admin token" aria-label="Admin token" required>
+
+    <h2 id="login-title">Approve this device</h2>
+    <p id="login-hint">Confirm the code shown in your terminal, or start a new session.</p>
+
+    <div id="device-box">
+      <div class="device-code" id="device-code">————-————</div>
+      <div class="device-meta" id="device-meta"></div>
+      <div id="device-email-row" hidden>
+        <input id="device-email" type="email" autocomplete="email" placeholder="Email for this account" aria-label="Email">
+      </div>
       <div id="login-error" class="login-error"></div>
-      <button class="primary" type="submit" style="width:100%">Continue</button>
+      <button class="primary" type="button" id="device-approve" style="width:100%">Approve</button>
+      <button class="ghost" type="button" id="device-deny" style="width:100%">Deny</button>
+    </div>
+
+    <form id="new-device-form" hidden>
+      <p class="small muted">No code yet? Start an authorization — the terminal command prints one.</p>
+      <pre class="device-cmd">bun src/authflow.ts</pre>
+      <div class="login-error" id="new-device-error"></div>
+      <button class="primary" type="button" id="device-start" style="width:100%">Start new authorization</button>
+    </form>
+
+    <button class="ghost" type="button" id="reveal-token" style="width:100%">Sign in with a token</button>
+    <form id="token-form" hidden>
+      <input id="login-token" type="password" autocomplete="off" placeholder="Access token or ADMIN_TOKEN" aria-label="Token">
+      <div id="token-error" class="login-error"></div>
+      <button class="primary" type="submit" style="width:100%">Sign in</button>
     </form>
   </div>
 </div>
@@ -521,7 +550,7 @@
       throw new ApiError("Cannot reach the gateway. Is it running?", 0);
     }
     if (res.status === 401) {
-      showLogin("Admin token rejected.");
+      showLogin("Your session ended. Sign in again.");
       throw new ApiError("Unauthorized", 401);
     }
     if (!res.ok) {
@@ -557,32 +586,165 @@
     }
   }
 
-  // ---------- login ----------
-  function showLogin(message) {
+  // ---------- login (device flow) ----------
+  // Same protocol as warm-run-cli: the browser approves a device code that a
+  // terminal client is polling for. The browser itself holds the resulting
+  // bearer token in an HttpOnly cookie and never puts it in localStorage.
+  let currentUser = null;
+  let pendingCode = "";
+
+  function showPane(which) {
+    $("#device-box").hidden = which !== "device";
+    $("#new-device-form").hidden = which !== "new";
+    $("#token-form").hidden = which !== "token";
+    $("#reveal-token").hidden = which === "token";
+    const titles = {
+      device: ["Approve this device", "Confirm the code shown in your terminal."],
+      new: ["Start a device authorization", "Run the command in your terminal, then approve the code it prints."],
+      token: ["Sign in with a token", "An access token (kgd_…) from credentials.json, or ADMIN_TOKEN."],
+    };
+    const [title, hint] = titles[which] || titles.device;
+    $("#login-title").textContent = title;
+    $("#login-hint").textContent = hint;
+    const focus = { device: "#device-approve", new: "#device-start", token: "#login-token" }[which];
+    setTimeout(() => { const el = $(focus); if (el) el.focus(); }, 30);
+  }
+
+  function showLogin(message, pane) {
     $("#login").hidden = false;
     $("#app").hidden = true;
-    $("#login-error").textContent = message || "";
-    setTimeout(() => $("#login-token").focus(), 30);
+    showPane(pane || "new");
+    if (message) $("#login-error").textContent = message;
   }
-  function hideLogin() { $("#login").hidden = true; }
 
-  $("#login-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const token = $("#login-token").value.trim();
-    if (!token) return;
-    adminToken = token;
-    const res = await fetch("/api/health", { headers: { "x-admin-token": token } }).catch(() => null);
-    if (!res || !res.ok) {
-      adminToken = "";
-      $("#login-error").textContent = "That token was rejected.";
+  async function describeCode(code) {
+    const res = await fetch(`/api/auth/device/pending?user_code=${encodeURIComponent(code)}`).catch(() => null);
+    const body = res && res.ok ? await res.json() : null;
+    $("#device-code").textContent = code;
+    if (!body || !body.found) {
+      $("#device-meta").textContent = "Unknown code — check the terminal.";
+      $("#device-approve").disabled = true;
       return;
     }
-    localStorage.setItem(TOKEN_KEY, token);
-    $("#login-token").value = "";
-    hideLogin();
+    const state = body.expired ? "expired" : body.status;
+    $("#device-meta").textContent = `client ${body.client_id} · ${state}`;
+    // Bootstrap: with no signed-in user, the approval must name the account.
+    $("#device-email-row").hidden = Boolean(currentUser) || state !== "pending";
+    $("#device-approve").disabled = state !== "pending";
+    $("#device-deny").disabled = state !== "pending";
+  }
+
+  async function approveCode() {
+    const typed = ($("#device-email") && $("#device-email").value.trim()) || "";
+    const email = currentUser ? currentUser.email : typed;
+    if (!email) {
+      $("#login-error").textContent = "Enter the email for this account.";
+      return;
+    }
+    // `attach_existing` acknowledges that an existing account is being bound.
+    // Only an install-token holder reaches here with an existing email, and the
+    // server logs the attachment; asking again in the UI would be theatre.
+    const res = await fetch("/api/auth/device/approve", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ user_code: pendingCode, email, attach_existing: true }),
+    }).catch(() => null);
+    const body = res && res.ok ? await res.json().catch(() => null) : null;
+    if (!res || !res.ok) {
+      const why = (body && (body.error || body.error_description)) || (res ? `HTTP ${res.status}` : "network error");
+      $("#login-error").textContent = `Approval failed: ${why}`;
+      return;
+    }
+    await enterApp((body && body.user) || currentUser);
+  }
+
+  async function enterApp(user) {
+    currentUser = user || null;
+    localStorage.removeItem(TOKEN_KEY);
+    adminToken = "";
+    $("#login").hidden = true;
     $("#app").hidden = false;
     route();
     loadStatus();
+  }
+
+  $("#device-approve").addEventListener("click", approveCode);
+  $("#device-deny").addEventListener("click", async () => {
+    await fetch("/api/auth/device/deny", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ user_code: pendingCode }),
+    }).catch(() => {});
+    showLogin("Authorization denied.", "new");
+  });
+
+  $("#device-start").addEventListener("click", async () => {
+    const res = await fetch("/api/auth/device/code", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ client_id: "kilo-gateway-dashboard" }),
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      $("#new-device-error").textContent = "Cannot reach the gateway.";
+      return;
+    }
+    const grant = await res.json();
+    pendingCode = grant.user_code;
+    // A browser-started authorization polls itself into a session.
+    pollForToken(grant.device_code, grant.interval);
+    showPane("device");
+    describeCode(grant.user_code);
+  });
+
+  /** Browser-side polling: same grant_type the CLI uses. */
+  async function pollForToken(deviceCode, interval) {
+    const deadline = Date.now() + 600_000;
+    let wait = interval;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, wait * 1000));
+      const res = await fetch("/api/auth/device/token", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+          device_code: deviceCode,
+          client_id: "kilo-gateway-dashboard",
+        }),
+      }).catch(() => null);
+      if (!res) continue;
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) { await enterApp(body.user); return; }
+      if (body.error === "slow_down") { wait = Math.min(wait + 5, 60); continue; }
+      if (body.error === "authorization_pending") continue;
+      if (body.error === "access_denied") { $("#login-error").textContent = "Denied."; return; }
+      if (body.error === "expired_token") { $("#login-error").textContent = "That code expired."; showPane("new"); return; }
+    }
+  }
+
+  $("#reveal-token").addEventListener("click", () => showPane("token"));
+  $("#token-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const token = $("#login-token").value.trim();
+    if (!token) return;
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token }),
+    }).catch(() => null);
+    const body = res && res.ok ? await res.json().catch(() => null) : null;
+    if (!res || !res.ok) {
+      $("#token-error").textContent = (body && body.error) || "That token was rejected.";
+      return;
+    }
+    $("#login-token").value = "";
+    if (body && body.kind === "admin_token") {
+      // The install token stays in localStorage, exactly as before.
+      adminToken = token;
+      localStorage.setItem(TOKEN_KEY, token);
+      await enterApp(null);
+      return;
+    }
+    await enterApp(body && body.user);
   });
 
   // ---------- charts ----------
@@ -1115,7 +1277,7 @@
           <tbody>${keys.length ? keys.map((k) => `
             <tr>
               <td><div class="cell-main">${esc(k.name)}</div><div class="cell-sub mono">${esc(k.prefix)}…</div></td>
-              <td><span class="small muted">${k.rpm ? esc(k.rpm) + " rpm" : "rpm ∞"} · ${k.daily_limit ? exact(k.daily_limit) + "/day" : "requests ∞"}${k.has_upstream_key ? ` · <span class="tag">upstream key</span>` : ""}</span></td>
+              <td><span class="small muted">${k.rpm ? esc(k.rpm) + " rpm" : "rpm ∞"} · ${k.daily_limit ? exact(k.daily_limit) + "/day" : "requests ∞"}${k.egress ? ` · <span class="tag">${esc(k.egress)} egress</span>` : ""}${k.has_upstream_key ? ` · <span class="tag">upstream key</span>` : ""}</span></td>
               <td class="num">${exact(k.usage.today_requests)}<div class="cell-sub">${fmt(k.usage.today_tokens)} tok</div></td>
               <td class="num">${exact(k.usage.requests)}<div class="cell-sub">${fmt(k.usage.total_tokens)} tok</div></td>
               <td class="small muted">${esc(ago(k.last_used_at))}</td>
@@ -1157,6 +1319,12 @@
           <label class="field full">Name <input id="nk-name" placeholder="Work laptop" maxlength="60" autofocus></label>
           <label class="field">Requests per minute <input id="nk-rpm" type="number" min="0" step="1" placeholder="0"></label>
           <label class="field">Requests per day <input id="nk-daily" type="number" min="0" step="1" placeholder="0"></label>
+          <label class="field full">Egress <span class="small faint" style="font-weight:400">Anonymous traffic always uses the WARP pool; this key may go direct</span>
+            <select id="nk-egress">
+              <option value="">Follow gateway default</option>
+              <option value="warp">WARP pool</option>
+              <option value="direct">Direct (no proxy)</option>
+            </select></label>
           <label class="field full">Upstream Kilo key <span class="small faint" style="font-weight:400">Optional — attaches a real sk-/pk- key for paid models</span>
             <input id="nk-upstream" type="password" placeholder="sk-…" autocomplete="off"></label>
         </div>`,
@@ -1173,6 +1341,7 @@
             rpm: Number($("#nk-rpm").value) || 0,
             daily_limit: Number($("#nk-daily").value) || 0,
             upstream_key: $("#nk-upstream").value.trim(),
+            egress: $("#nk-egress").value || null,
           }),
         });
         closeModal();
@@ -1290,7 +1459,13 @@
 
   // ---------- settings ----------
   async function renderSettings(view) {
-    const [cfg, health] = await Promise.all([api("/api/config"), api("/api/health").catch(() => null)]);
+    const [cfg, health, usersRes, egress] = await Promise.all([
+      api("/api/config"),
+      api("/api/health").catch(() => null),
+      api("/api/users").catch(() => ({ users: [] })),
+      api("/api/egress").catch(() => null),
+    ]);
+    const users = usersRes.users || [];
     const origin = location.origin;
     const needsKey = cfg.require_key;
     const sampleKey = needsKey ? "<gateway-key>" : "unused";
@@ -1352,7 +1527,121 @@ ANTHROPIC_AUTH_TOKEN=${needsKey ? "<gateway-key>" : "unused"}</pre></div>
           </div>
           <div class="snippet" style="margin-top:14px"><button class="sm ghost" data-copy="admin">Copy</button><pre>curl ${esc(origin)}/api/overview \\\n  -H "x-admin-token: ${cfg.admin_required ? "<ADMIN_TOKEN>" : ""}"</pre></div>
         </section>
+      </div>
+
+      <div class="grid-2" style="margin-top:14px">
+        <section class="card">
+          <div class="card-head"><h3>Accounts</h3><span class="hint">${users.length} ${users.length === 1 ? "account" : "accounts"}</span></div>
+          <p class="small muted">Sign-in uses the <code>device_code</code> flow (RFC 8628), same as the Warm CLI: a terminal requests a code, you approve it here. Clients use <code>kg_</code> API keys from the API keys page.</p>
+          <div class="snippet" style="margin-top:10px"><pre>bun src/authflow.ts ${esc(origin)} --out ./credentials.json</pre></div>
+          <div class="table-wrap" style="margin-top:12px">
+            <table>
+              <thead><tr><th>Account</th><th>Role</th><th>Last login</th><th></th></tr></thead>
+              <tbody>${users.map((u) => `<tr>
+                <td><div class="strong">${esc(u.name)}</div><div class="faint small">${esc(u.email)}${u.disabled ? " · disabled" : ""}</div></td>
+                <td><span class="badge ${u.role === "owner" ? "ok" : "muted"}">${esc(u.role)}</span></td>
+                <td class="faint">${u.last_login_at ? esc(ago(u.last_login_at)) : "never"}</td>
+                <td class="num"><button class="sm ghost" data-user-toggle="${esc(u.id)}" data-disabled="${u.disabled ? "1" : "0"}">${u.disabled ? "Enable" : "Disable"}</button></td>
+              </tr>`).join("") || `<tr><td colspan="4" class="faint">No accounts yet.</td></tr>`}</tbody>
+            </table>
+          </div>
+          <form class="form-grid" id="add-user" style="margin-top:14px">
+            <input name="name" placeholder="Name" autocomplete="off">
+            <input name="email" type="email" placeholder="Email" autocomplete="off" required>
+            <div class="full row"><button class="primary sm" type="submit">Add account</button></div>
+          </form>
+        </section>
+        <section class="card">
+          <div class="card-head"><h3>Upstream accounts</h3><span class="hint" id="pool-hint">—</span></div>
+          <p class="small muted">Kilo credentials borrowed for anonymous traffic, rotated round-robin. Only a rejected credential is benched (10 min); when all are benched the call rides WARP with no credential.</p>
+          <div id="pool-keys" class="stack" style="margin-top:10px"></div>
+          <form class="form-grid" id="pool-add" style="margin-top:12px">
+            <input name="key" type="password" placeholder="sk-… or pk-…" autocomplete="off" required class="full">
+            <div class="full row"><button class="primary sm" type="submit">Add credential</button></div>
+          </form>
+        </section>
+        <section class="card">
+          <div class="card-head"><h3>Egress</h3><span class="hint">${egress && egress.enabled ? `${egress.proxies.length} exits` : "direct"}</span></div>
+          <p class="small muted">Anonymous traffic (no key, or a key past its quota) always rides this pool; a 429/403 on one exit is retried on the next before the client sees anything. Keys may pin direct or follow the gateway default.</p>
+          <dl class="def-grid" style="margin-top:10px">
+            <div class="def"><dt>Mode</dt><dd>${egress && egress.enabled ? "rotating pool" : "direct egress"}</dd></div>
+            <div class="def"><dt>Exits</dt><dd>${egress && egress.enabled ? egress.proxies.length : "—"}</dd></div>
+            <div class="def"><dt>Max tries / call</dt><dd>${egress ? egress.max_attempts : "—"}</dd></div>
+            <div class="def"><dt>Anonymous</dt><dd>${egress && egress.policy ? esc(egress.policy.anonymous) : "warp"}</dd></div>
+            <div class="def"><dt>Keys (unpinned)</dt><dd>${egress && egress.policy ? esc(egress.policy.authenticated) : "auto"}</dd></div>
+          </dl>
+          ${egress && egress.enabled ? `<div class="snippet" style="margin-top:12px"><pre>EGRESS_PROXIES=${esc(egress.proxies.join(","))}</pre></div>` : `<div class="snippet" style="margin-top:12px"><pre>EGRESS_PROXIES=http://127.0.0.1:18789,http://127.0.0.1:18790</pre></div>`}
+          <div class="table-wrap" style="margin-top:12px">
+            <table>
+              <thead><tr><th>Exit</th><th class="num">Calls</th><th class="num">Retries</th><th class="num">Errors</th></tr></thead>
+              <tbody>${(egress && egress.usage || []).map((row) => `<tr>
+                <td class="mono small">${esc(row.egress)}</td>
+                <td class="num">${exact(row.requests)}</td>
+                <td class="num">${exact(row.retries)}</td>
+                <td class="num">${exact(row.errors)}</td>
+              </tr>`).join("") || `<tr><td colspan="4" class="faint">No proxied calls yet.</td></tr>`}</tbody>
+            </table>
+          </div>
+        </section>
       </div>`;
+
+    async function drawPool() {
+      const res = await api("/api/upstream-keys").catch(() => null);
+      const box = $("#pool-keys", view);
+      if (!box) return;
+      if (!res) { box.innerHTML = `<p class="faint small">Unavailable on this runtime.</p>`; return; }
+      $("#pool-hint", view).textContent = `${res.available}/${res.total} available`;
+      box.innerHTML = res.keys.length
+        ? res.keys.map((k) => `<div class="row between" style="padding:7px 0;border-top:1px solid var(--border)">
+            <span class="mono small">${esc(k.key)}</span>
+            <span class="row" style="gap:8px">
+              ${k.cooldown_s > 0 ? `<span class="badge bad">${Math.ceil(k.cooldown_s / 60)}m cooldown</span>` : `<span class="badge ok">ready</span>`}
+              <button class="sm ghost" data-pool-remove="${esc(k.id)}" title="Remove ${esc(k.key)}">✕</button>
+            </span>
+          </div>`).join("")
+        : `<p class="faint small">No credentials pooled. Anonymous traffic goes upstream with no key.</p>`;
+    }
+    await drawPool();
+
+    $("#pool-add", view)?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const key = new FormData(e.target).get("key");
+      try {
+        await api("/api/upstream-keys", { method: "POST", body: JSON.stringify({ action: "add", key }) });
+        toast("Credential pooled", "ok");
+        e.target.reset();
+        await drawPool();
+      } catch (err) { toast(err.message, "bad"); }
+    });
+
+    view.querySelectorAll("[data-pool-remove]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        try {
+          await api("/api/upstream-keys", {
+            method: "POST",
+            body: JSON.stringify({ action: "remove", key: btn.getAttribute("data-pool-remove") }),
+          });
+          toast("Credential removed", "ok");
+          await drawPool();
+        } catch (err) { toast(err.message, "bad"); }
+      });
+    });
+
+    $("#add-user", view)?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      try {
+        await api("/api/users", {
+          method: "POST",
+          body: JSON.stringify({
+            name: String(form.get("name") || ""),
+            email: String(form.get("email") || ""),
+          }),
+        });
+        toast("Account created", "ok");
+        renderPage();
+      } catch (err) { toast(err.message, "bad"); }
+    });
 
     const snippets = {
       base: `${location.origin}/v1`,
@@ -1365,8 +1654,20 @@ ANTHROPIC_AUTH_TOKEN=${needsKey ? "<gateway-key>" : "unused"}</pre></div>
       const copyBtn = e.target.closest("[data-copy]");
       if (copyBtn) { copy(snippets[copyBtn.getAttribute("data-copy")] || ""); return; }
       if (e.target.id === "ttl-refresh") { try { await api("/api/models?refresh=1"); toast("Catalog refreshed", "ok"); renderPage(); } catch (err) { toast(err.message, "bad"); } }
+      const toggle = e.target.closest("[data-user-toggle]");
+      if (toggle) {
+        const id = toggle.getAttribute("data-user-toggle");
+        const disabled = toggle.getAttribute("data-disabled") === "1";
+        try {
+          await api(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify({ disabled: !disabled }) });
+          toast(disabled ? "Account enabled" : "Account disabled", "ok");
+          renderPage();
+        } catch (err) { toast(err.message, "bad"); }
+        return;
+      }
       if (e.target.id === "logout") {
-        localStorage.removeItem(TOKEN_KEY); adminToken = "";
+        await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+        localStorage.removeItem(TOKEN_KEY); adminToken = ""; currentUser = null;
         location.hash = "#overview"; location.reload();
       }
       if (e.target.id === "export-all") {
@@ -1390,37 +1691,59 @@ ANTHROPIC_AUTH_TOKEN=${needsKey ? "<gateway-key>" : "unused"}</pre></div>
   }
 
   // ---------- boot ----------
+  // Three entry states: an approved /device code to confirm, an existing
+  // session, or a fresh install where the first account is created by whoever
+  // holds ADMIN_TOKEN (or by the first device approval on an open gateway).
   async function boot() {
-    let status = { admin_required: false, key_required: false, version: "" };
+    let status = { admin_required: false, key_required: false, version: "", user: null, setup_required: false, user_count: 0 };
     try {
-      const res = await fetch("/api/auth-status");
+      const res = await fetch("/api/auth/status");
       if (res.ok) status = await res.json();
-    } catch { /* offline; the login path still works */ }
+    } catch { /* offline; the device pane still renders */ }
     state.authStatus = status;
 
-    const url = new URL(location.href);
-    const urlToken = url.searchParams.get("token");
+    const params = new URL(location.href);
+    const urlToken = params.searchParams.get("token");
     if (urlToken) {
       adminToken = urlToken;
       localStorage.setItem(TOKEN_KEY, urlToken);
-      url.searchParams.delete("token");
-      history.replaceState(null, "", url.pathname + (url.search || "") + url.hash);
+      params.searchParams.delete("token");
+      history.replaceState(null, "", params.pathname + (params.search || "") + params.hash);
     }
 
-    if (status.admin_required) {
-      if (!adminToken) { showLogin(); return; }
-      const check = await fetch("/api/health", { headers: { "x-admin-token": adminToken } }).catch(() => null);
-      if (!check || !check.ok) {
-        localStorage.removeItem(TOKEN_KEY);
-        adminToken = "";
-        showLogin(check && check.status === 401 ? "Admin token rejected." : "Gateway unreachable.");
-        return;
-      }
+    const code = (params.searchParams.get("user_code") || "").toUpperCase();
+    if (code) {
+      pendingCode = code;
+      $("#login").hidden = false;
+      $("#app").hidden = true;
+      showPane("device");
+      describeCode(code);
+      return;
     }
-    hideLogin();
-    $("#app").hidden = false;
-    route();
-    loadStatus();
+
+    if (status.user) { await enterApp(status.user); return; }
+
+    if (adminToken) {
+      const check = await fetch("/api/health", { headers: { "x-admin-token": adminToken } }).catch(() => null);
+      if (check && check.ok) { await enterApp(null); return; }
+      localStorage.removeItem(TOKEN_KEY);
+      adminToken = "";
+    }
+
+    // An install with no ADMIN_TOKEN is open: the API answers anonymously, so
+    // gating the UI behind a login would demand credentials the server never
+    // asks for. Enter directly; signing in is optional (Accounts → Sign in).
+    if (!status.admin_required && !status.setup_required) {
+      await enterApp(null);
+      return;
+    }
+
+    showLogin(
+      status.setup_required
+        ? "First run: start an authorization below, approve it, and that account becomes the owner."
+        : "Start a device authorization to sign in.",
+      "new",
+    );
   }
 
   window.addEventListener("hashchange", route);

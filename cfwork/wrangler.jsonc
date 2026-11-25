@@ -1,0 +1,16 @@
+{
+  // Pass-through Worker: no secrets. Clients send their own Kilo key.
+  //   cd cfwork && npx wrangler deploy
+  //
+  // `nodejs_compat` is required: `security.ts` and `proxy.ts` use `node:crypto`
+  // (`createHash`, `randomUUID`, `timingSafeEqual`), which Workers provide under
+  // this flag. No other Node API is imported — `node:sqlite` and `node:fs` are
+  // deliberately kept out of the Worker's import graph.
+  "name": "kilo-gateway",
+  "main": "worker.ts",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  }
+}

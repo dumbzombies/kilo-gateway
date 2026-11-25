@@ -24,3 +24,11 @@ dist/
 logs/
 nohup.out
 *.local.json
+
+# Upstream credential pool (lives in ~/.kilo-gateway, never committed)
+keys.json
+.wbuild/
+data-node/
+
+# Agent session notes (local working context, not product docs)
+.agents/

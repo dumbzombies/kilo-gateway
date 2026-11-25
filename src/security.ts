@@ -9,7 +9,7 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { ApiKeyRow } from "./db.ts";
 import type { Config } from "./config.ts";
-import { startOfUtcDay } from "./db.ts";
+import type { UpstreamPool } from "./keypool.ts";
 import type { Store } from "./db.ts";
 
 export const KEY_PREFIX = "kg_";
@@ -59,6 +59,29 @@ export interface AuthContext {
   key: ApiKeyRow | null;
   /** Kilo credential to send upstream, if any. */
   upstreamKey: string | null;
+  /** True when `upstreamKey` came from the pooled credentials, not the caller. */
+  pooled?: boolean;
+  /** The quota reservation this request holds, when it authenticated as a key. */
+  quotaTicket?: string;
+  /**
+   * The key presented is valid but past its own quota: the call is served on
+   * the anonymous tier instead of failing, so an agent keeps working. Set on
+   * `open`-mode contexts only.
+   */
+  degraded?: { reason: "rpm" | "daily"; keyName: string; retryAfter: string };
+}
+
+/**
+ * Releases the quota slot a successful `authenticate()` reserved.
+ *
+ * Callers that answer without going through `handleProxy` (model listings,
+ * oversized bodies, auth-adjacent short circuits) must call this, or the slot
+ * leaks and the key is silently degraded by traffic it never generated.
+ */
+export function releaseQuotaFor(outcome: AuthOutcome, store: Store): void {
+  if (outcome.ok && outcome.auth.key) {
+    store.releaseQuota(outcome.auth.key.id, outcome.auth.quotaTicket);
+  }
 }
 
 export type AuthOutcome =
@@ -69,7 +92,13 @@ function errorBody(message: string, type: string, code: string): Record<string, 
   return { error: { message, type, code } };
 }
 
-export function authenticate(req: Request, url: URL, cfg: Config, store: Store): AuthOutcome {
+export function authenticate(
+  req: Request,
+  url: URL,
+  cfg: Config,
+  store: Store,
+  pool?: UpstreamPool,
+): AuthOutcome {
   const token = presentedToken(req, url);
   const admin = cfg.adminToken !== "" && token !== "" && constantTimeEqual(token, cfg.adminToken);
 
@@ -93,28 +122,34 @@ export function authenticate(req: Request, url: URL, cfg: Config, store: Store):
       };
     }
     const now = Date.now();
-    if (key.rpm > 0 && store.keyRequestsSince(key.id, now - 60_000) >= key.rpm) {
-      return {
-        ok: false,
-        status: 429,
-        body: errorBody(`Rate limit exceeded (${key.rpm} requests/minute).`, "rate_limit_error", "rate_limited"),
-        headers: { "retry-after": "60" },
-      };
+    // Quota exhaustion is a tier boundary, not an error: the request is served
+    // anonymously (WARP egress by default) so an agentic client never sees a
+    // 429 it cannot act on. The response still advertises the degradation.
+    //
+    // The check *and* the reservation are one synchronous step, so a concurrent
+    // burst cannot all observe the same pre-burst count.
+    const quota = store.reserveQuota(key, now);
+    if (quota.exceeded === "rpm") {
+      return { ok: true, auth: degrade(key, "rpm", "60") };
     }
-    if (key.daily_limit > 0 && store.keyRequestsSince(key.id, startOfUtcDay(now)) >= key.daily_limit) {
-      return {
-        ok: false,
-        status: 429,
-        body: errorBody(
-          `Daily request limit reached (${key.daily_limit}/day). Resets at 00:00 UTC.`,
-          "rate_limit_error",
-          "daily_limit_exceeded",
-        ),
-        headers: { "retry-after": "3600" },
-      };
+    if (quota.exceeded === "daily") {
+      return { ok: true, auth: degrade(key, "daily", "3600") };
     }
     store.touchKey(key.id, now);
-    return { ok: true, auth: { mode: "key", key, upstreamKey: key.upstream_key } };
+    // Client identity and upstream credential are independent: a key without
+    // its own Kilo credential borrows a pooled one, so a dashboard-issued key
+    // gets the pooled accounts instead of falling back to the anonymous tier.
+    const borrowed = key.upstream_key ? null : (pool?.next() ?? null);
+    return {
+      ok: true,
+      auth: {
+        mode: "key",
+        key,
+        upstreamKey: key.upstream_key ?? borrowed,
+        pooled: borrowed !== null,
+        quotaTicket: quota.ticket ?? undefined,
+      },
+    };
   }
 
   if (admin) return { ok: true, auth: { mode: "admin", key: null, upstreamKey: null } };
@@ -138,7 +173,22 @@ export function authenticate(req: Request, url: URL, cfg: Config, store: Store):
     };
   }
 
-  return { ok: true, auth: { mode: "open", key: null, upstreamKey: null } };
+  // Anonymous tier. When the upstream credential pool still has a usable key,
+  // borrow one so the call rides the pooled account; when every key is cooling
+  // ("all logins hit quota"), this returns no upstreamKey and the request goes
+  // out on the anonymous tier via WARP.
+  const borrowed = pool?.next() ?? null;
+  return { ok: true, auth: { mode: "open", key: null, upstreamKey: borrowed, pooled: borrowed !== null } };
+}
+
+/** The anonymous-tier context used when a valid key is past its quota. */
+function degrade(key: ApiKeyRow, reason: "rpm" | "daily", retryAfter: string): AuthContext {
+  return {
+    mode: "open",
+    key: null,
+    upstreamKey: null,
+    degraded: { reason, keyName: key.name, retryAfter },
+  };
 }
 
 export interface CreatedKey {

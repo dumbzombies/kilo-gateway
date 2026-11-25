@@ -1,261 +1,283 @@
-# kilo-gateway
+<div align="center">
 
-Kilo Gateway's free models behind one OpenAI/Anthropic-compatible endpoint —
-with managed API keys, quotas, request analytics and a built-in dashboard.
-Runs as a single Bun process with SQLite; no external services.
+# ⚡ kilo-gateway
 
-```sh
-bun src/main.ts
-# dashboard → http://127.0.0.1:8080/
-# base URL  → http://127.0.0.1:8080/v1
-```
+**Every free model on Kilo, behind one endpoint.**
 
-Free models need **no account and no key**. The gateway is a wire-transparent
-proxy plus a live free-model catalog: requests are forwarded untouched
-(streaming included), while the gateway records usage and enforces optional
-per-key limits.
+OpenAI- and Anthropic-compatible. Anonymous by default. Managed keys, quotas,
+analytics and a dashboard — in a single binary with no runtime dependencies.
 
-## Features
+[Quick start](#quick-start) · [Dashboard](#dashboard) · [Configuration](#configuration) · [Auth](#authentication) · [How it works](#how-it-works)
 
-- **Three wire formats** — OpenAI Chat Completions, Anthropic Messages
-  (including `count_tokens`), OpenAI Responses, legacy completions and
-  embeddings.
-- **Dashboard** — traffic and token charts, live catalog, request log with
-  filters and CSV export, a streaming playground, and key management.
-- **Managed keys** — `kg_…` credentials hashed at rest, per-key requests/minute
-  and requests/day limits, last-used tracking, revoke/delete. Keys can carry
-  their own upstream Kilo key for paid models.
-- **Usage accounting** — prompt/completion tokens parsed from JSON responses
-  and from SSE (OpenAI, Anthropic and Responses events), latency, time to first
-  byte, upstream status and provider errors per request.
-- **SQLite persistence** — WAL mode, paginated history, retention purge every
-  6 hours. No Redis, no Postgres, no Node runtime.
-- **Ops-friendly** — `/healthz` and `/readyz`, graceful drain on
-  `SIGINT`/`SIGTERM`, optional access log, CORS, configurable body/timeout
-  limits, single-file binary build.
+</div>
+
+---
+
+## Why
+
+Kilo Gateway gives you free access to a rotating catalog of frontier models.
+Its API is OpenAI-shaped, which is fine until you want to point a *different*
+tool at it, track who used what, cap a runaway agent, or keep a provider blip
+from breaking your workflow.
+
+`kilo-gateway` sits in front of it:
+
+- **One endpoint, two wire protocols.** `/v1/chat/completions` (OpenAI) and
+  `/v1/messages` (Anthropic) both work. The Anthropic path is a *faithful
+  passthrough* — request body, `anthropic-version`, `anthropic-beta`, `x-api-key`
+  and the SSE event stream cross the gateway untouched.
+- **Nothing to install.** One compiled binary. No Python, no Node, no Redis, no
+  Postgres. State is a SQLite file.
+- **Anonymous-first.** It works with zero configuration. Add keys and accounts
+  when you want accounting, not before.
+- **Never fails on a rate limit.** Burn through your quota and the request
+  degrades to the anonymous tier instead of returning `429`.
+- **Egress you control.** Rotate upstream traffic through WARP or any HTTP
+  CONNECT proxy, with direct fallback so a dead tunnel costs latency, not a request.
 
 ## Quick start
 
+### One-shot install
+
+<table>
+<tr><th>Linux</th><th>Windows</th></tr>
+<tr><td>
+
 ```sh
-bun install                 # dev types only; runtime has no dependencies
-ADMIN_TOKEN=$(openssl rand -hex 24) bun src/main.ts
+curl -fsSL https://raw.githubusercontent.com/therealfreddied/kilo-gateway/main/install.sh | sh
 ```
 
-Open the printed dashboard URL. If `ADMIN_TOKEN` was set, the dashboard asks
-for it once and stores it in the browser. You can also open
-`http://127.0.0.1:8080/?token=$ADMIN_TOKEN`; the token is moved out of the URL
-and into `localStorage`.
+</td><td>
 
-Point any client at `http://127.0.0.1:8080/v1`:
+```powershell
+irm https://raw.githubusercontent.com/therealfreddied/kilo-gateway/main/install.ps1 | iex
+```
+
+</td></tr>
+<tr><th>Termux (Android)</th><th>From source</th></tr>
+<tr><td>
+
+```sh
+pkg install bun git
+curl -fsSL https://raw.githubusercontent.com/therealfreddied/kilo-gateway/main/install.sh | sh
+```
+
+</td><td>
+
+```sh
+git clone https://github.com/therealfreddied/kilo-gateway
+cd kilo-gateway && bun install
+bun src/server.ts
+```
+
+</td></tr>
+</table>
+
+Then open **http://127.0.0.1:8080/**.
+
+### Talk to it
 
 ```bash
+# OpenAI wire
 curl http://127.0.0.1:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
+  -H 'content-type: application/json' \
   -d '{"model":"kilo-auto/free","messages":[{"role":"user","content":"hi"}]}'
 ```
 
 ```bash
-# OpenAI-compatible client
-OPENAI_BASE_URL=http://127.0.0.1:8080/v1
-OPENAI_API_KEY=unused
-
-# Anthropic-compatible client
-ANTHROPIC_BASE_URL=http://127.0.0.1:8080
-ANTHROPIC_AUTH_TOKEN=unused
+# Anthropic wire — point Claude Code or the Anthropic SDK straight at it
+export ANTHROPIC_BASE_URL="http://127.0.0.1:8080"
+export ANTHROPIC_API_KEY=""            # must be explicitly empty
+export ANTHROPIC_AUTH_TOKEN="sk-..."   # your Kilo key, or a kg_ gateway key
+export ANTHROPIC_MODEL="anthropic/claude-sonnet-4.5"
 ```
-
-## Endpoints
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/` | Dashboard |
-| `GET` | `/healthz` | Liveness; never touches upstream |
-| `GET` | `/readyz` | 200 once the database and model catalog are ready |
-| `GET` | `/v1/models` | Free-model catalog (live, 5-minute cache) |
-| `POST` | `/v1/chat/completions` | OpenAI chat (stream + non-stream) |
-| `POST` | `/v1/messages` | Anthropic messages (stream + non-stream) |
-| `POST` | `/v1/messages/count_tokens` | Anthropic token estimate |
-| `POST` | `/v1/responses` | OpenAI Responses |
-| `POST` | `/v1/completions` | Legacy completions |
-| `POST` | `/v1/embeddings` | Embeddings |
-| `GET` | `/api/*` | Dashboard JSON API (admin token) |
-
-`/v1/*` responses carry `x-request-id` and `x-gateway-upstream-status`;
-upstream rate-limit headers (`x-ratelimit-*`, `retry-after`,
-`openai-processing-ms`) pass through unchanged.
-
-## Authentication
-
-Three independent credentials exist:
-
-| Credential | Format | Used for |
-|---|---|---|
-| Gateway key | `kg_…` | Client auth, quotas, per-key attribution |
-| Kilo key | `sk-…` / `pk-…` | Forwarded upstream for paid models |
-| Admin token | `ADMIN_TOKEN` | Dashboard API and `/v1` |
-
-Default behaviour is a drop-in keyless gateway:
-
-- Anonymous `/v1` requests ride Kilo's free tier.
-- `REQUIRE_KEY=1` makes a gateway key (or a real Kilo key) mandatory on `/v1`.
-- Only credentials that look like Kilo keys are forwarded upstream, so harness
-  placeholder keys never break the free tier.
-- The admin token is accepted on `/v1` too — that is what the dashboard
-  playground uses — and is always stripped before proxying.
-- Gateway keys are stored as SHA-256 hashes; the secret is shown once at
-  creation.
-
-Use a key:
-
-```bash
-curl http://127.0.0.1:8080/v1/chat/completions \
-  -H "Authorization: Bearer kg_your_key" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"kilo-auto/free","messages":[{"role":"user","content":"hi"}]}'
-```
-
-Create and manage keys from **API keys** in the dashboard, or over the API:
-
-```bash
-curl -X POST http://127.0.0.1:8080/api/keys \
-  -H "x-admin-token: $ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"CI","rpm":60,"daily_limit":2000}'
-```
-
-A key limit field of `0` means unlimited. Limits reset on a UTC day boundary;
-the request-per-minute window is the trailing 60 seconds.
-
-### Security notes
-
-- The listener binds `127.0.0.1` by default. Set `HOST=0.0.0.0` only behind a
-  trusted network or a TLS reverse proxy.
-- Without `ADMIN_TOKEN` the dashboard API is unauthenticated. Set it before
-  exposing the port. The dashboard shell itself is public and contains no data.
-- A per-key `upstream_key` is stored in plaintext in SQLite because the gateway
-  must replay it upstream. Leave it empty if you only use free models.
-- Gateway keys appear in request logs by name, never by secret.
-
-## Configuration
-
-Environment variables (Bun loads `.env` automatically):
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `PORT` | `8080` | Listen port |
-| `HOST` | `127.0.0.1` | Bind address |
-| `ADMIN_TOKEN` | *(empty)* | Dashboard/API admin token; empty leaves the API open |
-| `REQUIRE_KEY` | `0` | Require a gateway or Kilo key on `/v1` |
-| `DATA_DIR` | `./data` | SQLite directory |
-| `RETENTION_DAYS` | `30` | Delete request rows older than this; `0` keeps forever |
-| `KILO_UPSTREAM` | `https://api.kilo.ai/api/gateway` | Upstream base URL |
-| `CATALOG_TTL_MS` | `300000` | Model catalog cache lifetime |
-| `UPSTREAM_TIMEOUT_MS` | `900000` | Upstream request/stream deadline |
-| `MAX_BODY_BYTES` | `33554432` | Maximum accepted request body |
-| `ACCESS_LOG` | `0` | One line per request on stdout |
-| `CORS_ORIGIN` | `*` | `Access-Control-Allow-Origin` |
 
 ## Dashboard
 
-| Page | What it shows |
+A single-file dashboard ships inside the binary — charts, live request log,
+streaming playground, key management, account management, egress policy.
+
+```mermaid
+flowchart LR
+  C[Client<br/>OpenAI or Anthropic] -->|/v1/*| G
+
+  subgraph G[kilo-gateway]
+    direction TB
+    A[auth<br/>anonymous · kg_ key · account] --> Q[quota<br/>reserve · degrade]
+    Q --> E[egress<br/>WARP pool · direct fallback]
+    E --> R[records<br/>SQLite]
+  end
+
+  E -->|passthrough| U[(Kilo Gateway)]
+  R --> D[Dashboard<br/>/]
+```
+
+The dashboard needs no login on a fresh install. Set `ADMIN_TOKEN` to close it.
+
+## Authentication
+
+Three credentials, each for a different job.
+
+| Credential | For | Created by |
+|---|---|---|
+| *none* | anonymous access — the default | — |
+| `kg_…` **gateway key** | apps and agents you want metered | Dashboard → API keys |
+| **account** (device flow) | humans using the dashboard | `bun src/authflow.ts` |
+
+Gateway keys never leave the box: only a SHA-256 is stored, and the secret is
+shown once at creation.
+
+### Signing a terminal in (RFC 8628 device flow)
+
+```bash
+bun src/authflow.ts http://127.0.0.1:8080 --out ./credentials.json
+```
+
+It prints a code, you approve it in the browser at `/device`, and the terminal
+receives a bearer token in a `credentials.json`:
+
+```json
+{
+  "schemaVersion": 1,
+  "apiBaseUrl": "http://127.0.0.1:8080",
+  "accessToken": "kgd_…",
+  "authStyle": "bearer",
+  "expiresAt": "2026-12-25T…",
+  "user": { "id": "…", "name": "…", "email": "…" }
+}
+```
+
+## Quotas that degrade instead of failing
+
+A gateway key can carry `rpm` and `daily_limit`. When it runs out, the request
+is **not** rejected — it drops to the anonymous tier, which is why an agent
+that hits a limit keeps working:
+
+```http
+HTTP/1.1 200 OK
+x-gateway-tier: anonymous
+x-gateway-degraded: rpm
+retry-after: 60
+```
+
+Quota checks and reservations happen in one synchronous step, so a concurrent
+burst cannot race past the limit, and reservations are ticketed so a request
+that fails or is rejected gives its slot back.
+
+## Egress
+
+Set `EGRESS_PROXIES` to one or more HTTP CONNECT proxies (such as
+[warp-minimal](https://github.com/therealfreddied/warp-minimal)) and traffic
+rotates across them. A `429`, `403` or proxy-side `5xx` on one exit is retried
+on the next **before a byte reaches the client**.
+
+| Traffic | Egress |
 |---|---|
-| **Overview** | Requests, token throughput, errors, latency/p95, top models, recent calls, 1h/24h/7d/30d ranges |
-| **Playground** | Streaming chat against any free model through the gateway |
-| **Models** | Live catalog with context, modalities and 30-day usage; copy or test a model |
-| **API keys** | Create keys, limits, per-key usage, revoke/delete |
-| **Requests** | Filterable log with latency, TTFT, tokens, key, source; detail modal; CSV export |
-| **Settings** | Runtime config, integration snippets, catalog refresh, export, log deletion |
+| Anonymous | WARP pool always (`ANON_EGRESS=direct` opts out) |
+| Key, unpinned | `AUTH_EGRESS` (`auto` = pool when configured) |
+| Key, pinned | `direct` or `warp`, per key |
 
-Every number comes from the local SQLite database; charts are rendered as
-inline SVG with no external assets.
+When every exit is unreachable the gateway retries the request directly rather
+than failing it, and says so:
 
-## Free model catalog
-
-`/v1/models` fetches Kilo's model list and keeps models Kilo marks as
-`isFree`, with a zero-pricing + `free`-in-the-name fallback for older snapshots.
-The catalog rotates upstream, so the endpoint is authoritative; the dashboard
-shows when the snapshot was last refreshed. A failed refresh keeps serving the
-last good snapshot and reports the error in the dashboard.
-
-Known upstream quirks: free models share provider capacity, so individual
-models can return `429` (`limit_rpd` or fleet capacity) at any time. Retry,
-switch model, or attach your own provider key. The gateway forwards provider
-errors and status codes untouched.
-
-## Data
-
-One SQLite database at `$DATA_DIR/kilo-gateway.db` (WAL mode):
-
-- `api_keys` — hashed gateway keys, limits, optional upstream credential.
-- `requests` — one row per proxied call: model, key, status, latency, TTFT,
-  token counts, cost when reported, client, source, error.
-- `meta` — reserved for migrations.
-
-Set `RETENTION_DAYS=0` to keep history forever. Delete logs from **Settings** or
-`DELETE /api/requests`. Export via **Requests → Export CSV** or
-`GET /api/export.csv`.
-
-## Production
-
-Single binary:
-
-```sh
-bun build --compile src/main.ts --outfile dist/kilo-gateway
-./dist/kilo-gateway
+```http
+x-gateway-egress: direct
+x-gateway-egress-retries: 2
 ```
 
-Docker:
+> **Bun only.** Node's `fetch` has no `proxy` option and silently ignores one,
+> so under Node the pool is disabled and `/health` reports
+> `"proxy_supported": false`. Rotation needs Bun.
 
-```sh
-docker build -t kilo-gateway .
-docker run -p 8080:8080 -v kg-data:/data \
-  -e ADMIN_TOKEN=replace-me -e REQUIRE_KEY=1 kilo-gateway
+## Configuration
+
+Every value has a safe default. `.env` is loaded automatically.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PORT` | `8080` | Listen port |
+| `HOST` | `127.0.0.1` | Bind address |
+| `ADMIN_TOKEN` | *(empty)* | Closes the dashboard; the only thing that does |
+| `REQUIRE_KEY` | `0` | Require a key on `/v1` |
+| `DATA_DIR` | `./data` | SQLite location |
+| `RETENTION_DAYS` | `30` | Request-log retention |
+| `KILO_UPSTREAM` | `https://api.kilo.ai/api/gateway` | Upstream base |
+| `EGRESS_PROXIES` | *(empty)* | Comma-separated CONNECT proxies |
+| `ANON_EGRESS` | `warp` | `warp` or `direct` |
+| `AUTH_EGRESS` | `auto` | `auto`, `warp` or `direct` |
+| `KILO_KEYS` | *(empty)* | Comma-separated upstream credentials |
+| `CATALOG_TTL_MS` | `300000` | Free-model refresh interval |
+| `MAX_BODY_BYTES` | `33554432` | Request body cap |
+| `ACCESS_LOG` | `0` | Per-request stdout logging |
+
+Upstream credentials live in `~/.kilo-gateway/keys.json` (mode `600`), written
+atomically, and are also editable from **Settings → Upstream accounts**.
+
+## How it works
+
+```
+src/core.ts      Web-standard handle(request, env) — no runtime APIs
+src/server.ts    node:http entry — runs on Bun AND Node
+src/main.ts      Bun entry (idleTimeout, maxRequestBodySize)
+src/proxy.ts     wire-transparent forwarding, quotas, usage accounting
+src/accounts.ts  device-flow auth, sessions, tokens
+src/keypool.ts   upstream credential pool with cooldown
+src/egress.ts    exit rotation, failure decay, direct fallback
+src/db.ts        SQLite store; migrations run on boot
+cfwork/          pass-through Cloudflare Worker
 ```
 
-systemd:
+The core is runtime-neutral, so the same code backs the Bun entry, the Node
+entry, the Worker, and the tests.
 
-```ini
-[Unit]
-Description=kilo-gateway
-After=network-online.target
-Wants=network-online.target
+### Run it your way
 
-[Service]
-ExecStart=/usr/local/bin/kilo-gateway
-Environment=HOST=127.0.0.1
-Environment=PORT=8080
-Environment=ADMIN_TOKEN=replace-me
-Environment=REQUIRE_KEY=1
-Environment=DATA_DIR=/var/lib/kilo-gateway
-Restart=always
-RestartSec=2
-TimeoutStopSec=15
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/var/lib/kilo-gateway
-PrivateTmp=true
-
-[Install]
-WantedBy=multi-user.target
+```bash
+bun src/server.ts                    # Bun (recommended)
+node src/server.ts                   # Node 22+
+bun build --compile src/server.ts --outfile kilo-gateway   # single binary
+cd cfwork && npx wrangler deploy     # Cloudflare Worker (passthrough only)
 ```
 
-`SIGTERM` drains in-flight requests (10-second hard deadline), closes SQLite
-and exits 0. Upstream fetches are bounded by `UPSTREAM_TIMEOUT_MS`, and a
-thrown request handler returns a JSON 500 without stopping the process.
+### Develop
 
-## Development
-
-```sh
-bun test          # unit + HTTP integration against a fake upstream
-bun run typecheck # tsc, works on Termux too
-bun run dev       # watch mode
+```bash
+bun test              # 134 tests, no network required
+bun run typecheck
 ```
 
-The HTTP tests mount the production handler on an ephemeral `Bun.serve` port
-and exercise streaming, token accounting, key auth, quotas, error passthrough,
-admin auth, filtering and CSV export — no live upstream required.
+## Health
+
+```bash
+curl http://127.0.0.1:8080/health
+```
+
+```json
+{
+  "ok": true,
+  "version": "1.0.0",
+  "uptime_s": 3600,
+  "mode": "configured",
+  "keys_configured": 3,
+  "anonymous": "warp",
+  "egress": { "enabled": true, "proxy_supported": true, "proxies": ["…"] }
+}
+```
+
+`/readyz` reports database and catalog readiness separately, so a load balancer
+can distinguish "process up" from "can serve traffic".
+
+## Notes and limits
+
+- **The dashboard is open by default.** Set `ADMIN_TOKEN` before exposing the
+  port to anything but localhost.
+- **WARP rotation is Bun-only** (see above).
+- **`anthropic/claude-sonnet-4.5` and other paid models** need a real Kilo key
+  with entitlement; free models never do.
+- **Single process.** SQLite is assumed to be owned by one gateway instance.
 
 ## License
 
 MIT
+
+<div align="center"><sub>Not affiliated with Kilo. Built for people who want their tools to keep working.</sub></div>

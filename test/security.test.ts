@@ -109,7 +109,7 @@ describe("authentication", () => {
     if (!outcome.ok) expect(outcome.status).toBe(401);
   });
 
-  test("per-minute limits return 429 with Retry-After", () => {
+  test("per-minute quota exhaustion degrades to anonymous instead of failing", () => {
     const generated = generateKey();
     store.createKey({
       id: "key-1",
@@ -142,10 +142,13 @@ describe("authentication", () => {
       source: "api",
     });
     const outcome = authenticate(request(generated.secret), url(), makeConfig(), store);
-    expect(outcome.ok).toBe(false);
-    if (!outcome.ok) {
-      expect(outcome.status).toBe(429);
-      expect(outcome.headers["retry-after"]).toBe("60");
+    expect(outcome.ok).toBe(true);
+    if (outcome.ok) {
+      // Anonymous tier: no key attached, degradation recorded, no upstream key.
+      expect(outcome.auth.mode).toBe("open");
+      expect(outcome.auth.key).toBeNull();
+      expect(outcome.auth.upstreamKey).toBeNull();
+      expect(outcome.auth.degraded).toEqual({ reason: "rpm", keyName: "Fast", retryAfter: "60" });
     }
   });
 

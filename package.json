@@ -5,11 +5,13 @@
   "type": "module",
   "description": "Kilo Gateway free models as an OpenAI/Anthropic-compatible endpoint, with managed keys, quotas, request analytics and a dashboard.",
   "scripts": {
-    "start": "bun src/main.ts",
-    "dev": "bun --watch src/main.ts",
+    "start": "bun src/server.ts",
+    "start:node": "node src/server.ts",
+    "dev": "bun --watch src/server.ts",
     "test": "bun test",
     "typecheck": "bun node_modules/typescript/bin/tsc --noEmit",
-    "build": "bun build --compile src/main.ts --outfile dist/kilo-gateway"
+    "build": "bun build --compile src/server.ts --outfile dist/kilo-gateway",
+    "build:worker": "cd cfwork && npx wrangler deploy --dry-run --outdir ../.wbuild"
   },
   "engines": {
     "bun": ">=1.2.0"
