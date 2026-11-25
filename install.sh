@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # kilo-gateway installer for Linux and Termux.
 #
-#   curl -fsSL https://raw.githubusercontent.com/therealfreddied/kilo-gateway/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/dumbzombies/kilo-gateway/main/install.sh | sh
 #
 # Installs Bun if missing, clones the repo, builds a single self-contained
 # binary, and prints the dashboard URL. Re-running upgrades in place.
@@ -14,7 +14,7 @@
 
 set -eu
 
-REPO="https://github.com/therealfreddied/kilo-gateway.git"
+REPO="https://github.com/dumbzombies/kilo-gateway.git"
 DIR="${KG_DIR:-$HOME/.local/share/kilo-gateway}"
 BIN_DIR="${KG_BIN_DIR:-$HOME/.local/bin}"
 PORT="${KG_PORT:-8080}"

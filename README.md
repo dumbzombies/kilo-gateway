@@ -44,13 +44,13 @@ from breaking your workflow.
 <tr><td>
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/therealfreddied/kilo-gateway/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/dumbzombies/kilo-gateway/main/install.sh | sh
 ```
 
 </td><td>
 
 ```powershell
-irm https://raw.githubusercontent.com/therealfreddied/kilo-gateway/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/dumbzombies/kilo-gateway/main/install.ps1 | iex
 ```
 
 </td></tr>
@@ -59,13 +59,13 @@ irm https://raw.githubusercontent.com/therealfreddied/kilo-gateway/main/install.
 
 ```sh
 pkg install bun git
-curl -fsSL https://raw.githubusercontent.com/therealfreddied/kilo-gateway/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/dumbzombies/kilo-gateway/main/install.sh | sh
 ```
 
 </td><td>
 
 ```sh
-git clone https://github.com/therealfreddied/kilo-gateway
+git clone https://github.com/dumbzombies/kilo-gateway
 cd kilo-gateway && bun install
 bun src/server.ts
 ```

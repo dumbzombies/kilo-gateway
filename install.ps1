@@ -1,6 +1,6 @@
 # kilo-gateway installer for Windows (PowerShell 5.1+ or PowerShell 7).
 #
-#   irm https://raw.githubusercontent.com/therealfreddied/kilo-gateway/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/dumbzombies/kilo-gateway/main/install.ps1 | iex
 #
 # Installs Bun if missing, clones the repo, builds a self-contained .exe and
 # prints the dashboard URL. Re-running upgrades in place.
@@ -12,7 +12,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$Repo   = "https://github.com/therealfreddied/kilo-gateway.git"
+$Repo   = "https://github.com/dumbzombies/kilo-gateway.git"
 $Dir    = if ($env:KG_DIR) { $env:KG_DIR } else { Join-Path $HOME ".kilo-gateway" }
 $Port   = if ($env:KG_PORT) { $env:KG_PORT } else { 8080 }
 $BinDir = Join-Path $HOME ".kilo-gateway\bin"
